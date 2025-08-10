@@ -54,7 +54,12 @@ const Input: React.FC<InputProps> = ({
   const getBorderColor = () => {
     if (error && touched) return colors.error;
     if (isFocused) return colors.primary;
-    return colors.lightGray;
+    return colors.lightGray; // Darker border color for better visibility
+  };
+
+  const getBackgroundColor = () => {
+    if (isFocused) return colors.white;
+    return colors.white; // Always white background for better contrast
   };
 
   return (
@@ -71,6 +76,12 @@ const Input: React.FC<InputProps> = ({
           {
             borderColor: getBorderColor(),
             borderWidth: isFocused ? 2 : 1,
+            backgroundColor: getBackgroundColor(),
+            shadowColor: isFocused ? colors.primary : 'transparent',
+            shadowOffset: { width: 0, height: isFocused ? 2 : 0 },
+            shadowOpacity: isFocused ? 0.1 : 0,
+            shadowRadius: isFocused ? 4 : 0,
+            elevation: isFocused ? 2 : 0,
           },
         ]}
       >
@@ -118,13 +129,14 @@ const Input: React.FC<InputProps> = ({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    marginBottom: spacing.xs, // Reduced bottom margin
+    marginBottom: spacing.sm,
   },
   label: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily.medium,
     color: colors.textPrimary,
-    marginBottom: 2, // Minimal spacing
+    marginBottom: spacing.xs,
+    marginLeft: spacing.xs,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -132,13 +144,20 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     backgroundColor: colors.white,
     overflow: 'hidden',
-    minHeight: 40, // Set a minimum height
-    maxHeight: 45, // Set a maximum height
+    minHeight: 50,
+    maxHeight: 55,
+    borderWidth: 1,
+    borderColor: colors.lightGray,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
   },
   input: {
     flex: 1,
-    height: 20, // Significantly reduced height
-    paddingVertical: 0, // Remove vertical padding
+    height: 50,
+    paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily.regular,
@@ -149,13 +168,14 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    maxHeight: 40,
+    maxHeight: 50,
   },
   error: {
     fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily.regular,
     color: colors.error,
     marginTop: spacing.xs,
+    marginLeft: spacing.xs,
   },
 });
 

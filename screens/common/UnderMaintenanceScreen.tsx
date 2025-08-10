@@ -44,16 +44,15 @@ const UnderMaintenanceScreen: React.FC<UnderMaintenanceScreenProps> = ({
         <View style={styles.iconContainer}>
           <Ionicons name="construct" size={100} color={colors.primary} />
         </View>
-        
+
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.message}>{message}</Text>
-        
-        <Image
-          source={require('../../assets/images/maintenance.png')}
-          style={styles.image}
-          resizeMode="contain"
-        />
-        
+
+        <View style={styles.imageContainer}>
+          <Ionicons name="hammer-outline" size={80} color={colors.secondary} />
+          <Ionicons name="build-outline" size={80} color={colors.primary} />
+        </View>
+
         <TouchableOpacity
           style={styles.button}
           onPress={() => navigation.goBack()}
@@ -114,10 +113,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing.xl,
   },
-  image: {
+  imageContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
     width: '100%',
     height: 200,
     marginBottom: spacing.xl,
+    backgroundColor: colors.surfaceLight,
+    borderRadius: 12,
+    padding: spacing.lg,
   },
   button: {
     backgroundColor: colors.primary,

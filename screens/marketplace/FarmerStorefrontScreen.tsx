@@ -97,7 +97,17 @@ const FarmerStorefrontScreen = () => {
         {
           text: 'Message',
           onPress: () => {
-            navigation.navigate('Chat' as never, { recipientId: farmerId } as never);
+            // Navigate to Home stack first, then to ChatScreen
+            navigation.navigate('Home' as never, {
+              screen: 'ChatScreen',
+              params: {
+                chatId: `user_${userProfile?.uid}_${farmerId}`,
+                recipientId: farmerId,
+                recipientName: farmer?.displayName || 'Farmer',
+                recipientPhoto: farmer?.photoURL || '',
+                isGroup: false
+              }
+            } as never);
           },
         },
         {
@@ -141,7 +151,12 @@ const FarmerStorefrontScreen = () => {
 
             <View style={styles.ratingContainer}>
               <Ionicons name="star" size={14} color={colors.secondary} />
-              <Text style={styles.ratingText}>{formatRating(item.averageRating)}</Text>
+              <Text style={styles.ratingText}>
+                {formatRating(item.averageRating)}
+                {item.ratings && item.ratings.length > 0 && (
+                  <Text style={styles.productRatingCount}> ({item.ratings.length})</Text>
+                )}
+              </Text>
             </View>
           </View>
 
@@ -603,6 +618,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  productRatingCount: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '400',
+  },
   ratingCount: {
     ...typography.caption,
     color: colors.textSecondary,
@@ -770,10 +791,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.small,
   },
   aboutSection: {
-    gap: spacing.medium,
+    gap: 10,
   },
   aboutCard: {
-    padding: spacing.medium,
+    padding: 10,
   },
   sectionTitle: {
     ...typography.h3,
@@ -798,7 +819,7 @@ const styles = StyleSheet.create({
     gap: spacing.medium,
   },
   reviewCard: {
-    padding: spacing.medium,
+    padding: 10,
   },
   reviewHeader: {
     flexDirection: 'row',

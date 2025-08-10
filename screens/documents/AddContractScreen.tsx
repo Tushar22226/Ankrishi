@@ -10,6 +10,7 @@ import {
   Alert,
   Switch,
   TextInput,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -37,6 +38,23 @@ const contractTypes: { value: ContractType; label: string }[] = [
 const AddContractScreen = () => {
   const navigation = useNavigation();
   const { userProfile } = useAuth();
+
+  // Collapsible section states
+  const [expandedSections, setExpandedSections] = useState({
+    basicInfo: true,
+    contractTerms: true,
+    farmingDetails: false,
+    aaccCertification: false,
+    structuredBidding: false,
+  });
+
+  // Toggle section expansion
+  const toggleSection = (section) => {
+    setExpandedSections({
+      ...expandedSections,
+      [section]: !expandedSections[section],
+    });
+  };
 
   // Form state
   const [title, setTitle] = useState('');
@@ -663,307 +681,338 @@ const AddContractScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         <Card style={styles.formCard}>
-          {/* Contract Type */}
-          <Text style={styles.label}>Contract Type</Text>
-          <View style={styles.typesContainer}>
-            {contractTypes.map((contractType) => (
-              <TouchableOpacity
-                key={contractType.value}
-                style={[
-                  styles.typeButton,
-                  type === contractType.value && styles.activeTypeButton,
-                ]}
-                onPress={() => setType(contractType.value)}
-              >
-                <Text
-                  style={[
-                    styles.typeText,
-                    type === contractType.value && styles.activeTypeText,
-                  ]}
-                >
-                  {contractType.label}
+          {/* Basic Information Section */}
+          <SectionHeader
+            title="Basic Information"
+            icon="information-circle-outline"
+            isExpanded={expandedSections.basicInfo}
+            onToggle={() => toggleSection('basicInfo')}
+            description="Type, title, value, parties"
+          />
+
+          {expandedSections.basicInfo && (
+            <View style={styles.sectionContent}>
+              {/* Contract Type */}
+              <Text style={styles.label}>Contract Type</Text>
+              <View style={styles.typesContainer}>
+                {contractTypes.map((contractType) => (
+                  <TouchableOpacity
+                    key={contractType.value}
+                    style={[
+                      styles.typeButton,
+                      type === contractType.value && styles.activeTypeButton,
+                    ]}
+                    onPress={() => setType(contractType.value)}
+                  >
+                    <Text
+                      style={[
+                        styles.typeText,
+                        type === contractType.value && styles.activeTypeText,
+                      ]}
+                    >
+                      {contractType.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Tender Switch */}
+              <View style={styles.switchContainer}>
+                <Text style={styles.switchLabel}>Create as Tender</Text>
+                <Switch
+                  value={isTender}
+                  onValueChange={setIsTender}
+                  trackColor={{ false: colors.lightGray, true: colors.primaryLight }}
+                  thumbColor={isTender ? colors.primary : colors.gray}
+                />
+              </View>
+
+              {isTender && (
+                <Text style={styles.tenderInfo}>
+                  Creating a tender allows other users to bid on your contract before it becomes active.
                 </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+              )}
 
-          {/* Tender Switch */}
-          <View style={styles.switchContainer}>
-            <Text style={styles.switchLabel}>Create as Tender</Text>
-            <Switch
-              value={isTender}
-              onValueChange={setIsTender}
-              trackColor={{ false: colors.lightGray, true: colors.primaryLight }}
-              thumbColor={isTender ? colors.primary : colors.gray}
-            />
-          </View>
-
-          {isTender && (
-            <Text style={styles.tenderInfo}>
-              Creating a tender allows other users to bid on your contract before it becomes active.
-            </Text>
-          )}
-
-          {/* Contract Title */}
-          <Input
-            label="Contract Title"
-            value={title}
-            onChangeText={setTitle}
-            placeholder="Enter contract title"
-            error={errors.title}
-          />
-
-          {/* Contract Description */}
-          <Input
-            label="Description"
-            value={description}
-            onChangeText={setDescription}
-            placeholder="Describe the contract"
-            multiline
-            numberOfLines={3}
-            error={errors.description}
-          />
-
-          {/* Contract Value */}
-          <Input
-            label="Contract Value (₹)"
-            value={value}
-            onChangeText={setValue}
-            placeholder="Enter total contract value"
-            keyboardType="numeric"
-            error={errors.value}
-          />
-
-          {/* Quantity and Unit */}
-          <View style={styles.row}>
-            <View style={styles.halfInput}>
+              {/* Contract Title */}
               <Input
-                label="Quantity"
-                value={quantity}
-                onChangeText={setQuantity}
-                placeholder="Enter quantity"
+                label="Contract Title"
+                value={title}
+                onChangeText={setTitle}
+                placeholder="Enter contract title"
+                error={errors.title}
+              />
+
+              {/* Contract Description */}
+              <Input
+                label="Description"
+                value={description}
+                onChangeText={setDescription}
+                placeholder="Describe the contract"
+                multiline
+                numberOfLines={3}
+                error={errors.description}
+              />
+
+              {/* Contract Value */}
+              <Input
+                label="Contract Value (₹)"
+                value={value}
+                onChangeText={setValue}
+                placeholder="Enter total contract value"
                 keyboardType="numeric"
-                error={errors.quantity}
+                error={errors.value}
               />
-            </View>
 
-            <View style={styles.halfInput}>
+              {/* Quantity and Unit */}
+              <View style={styles.row}>
+                <View style={styles.halfInput}>
+                  <Input
+                    label="Quantity"
+                    value={quantity}
+                    onChangeText={setQuantity}
+                    placeholder="Enter quantity"
+                    keyboardType="numeric"
+                    error={errors.quantity}
+                  />
+                </View>
+
+                <View style={styles.halfInput}>
+                  <Input
+                    label="Unit"
+                    value={unit}
+                    onChangeText={setUnit}
+                    placeholder="e.g., kg, quintal"
+                    error={errors.unit}
+                  />
+                </View>
+              </View>
+
+              {/* Price Per Unit */}
               <Input
-                label="Unit"
-                value={unit}
-                onChangeText={setUnit}
-                placeholder="e.g., kg, quintal"
-                error={errors.unit}
+                label="Price Per Unit (₹)"
+                value={pricePerUnit}
+                onChangeText={setPricePerUnit}
+                placeholder="Enter price per unit"
+                keyboardType="numeric"
+                error={errors.pricePerUnit}
               />
-            </View>
-          </View>
 
-          {/* Price Per Unit */}
-          <Input
-            label="Price Per Unit (₹)"
-            value={pricePerUnit}
-            onChangeText={setPricePerUnit}
-            placeholder="Enter price per unit"
-            keyboardType="numeric"
-            error={errors.pricePerUnit}
-          />
+              {/* Second Party Username */}
+              {!isTender && (
+                <Input
+                  label="Second Party Username"
+                  value={secondPartyUsername}
+                  onChangeText={setSecondPartyUsername}
+                  placeholder="Enter username of the other party"
+                  onBlur={checkUsername}
+                  error={errors.secondPartyUsername || usernameError}
+                />
+              )}
 
-          {/* Second Party Username */}
-          {!isTender && (
-            <Input
-              label="Second Party Username"
-              value={secondPartyUsername}
-              onChangeText={setSecondPartyUsername}
-              placeholder="Enter username of the other party"
-              onBlur={checkUsername}
-              error={errors.secondPartyUsername || usernameError}
-            />
-          )}
+              {/* Contract Dates */}
+              <Text style={styles.label}>Contract Period</Text>
+              <Text style={styles.helperText}>You can select any future dates for your contract.</Text>
 
-          {/* Contract Dates */}
-          <Text style={styles.label}>Contract Period</Text>
-          <Text style={styles.helperText}>You can select any future dates for your contract.</Text>
-
-          {/* Start Date */}
-          <TouchableOpacity
-            style={styles.dateButton}
-            onPress={() => setShowStartDatePicker(true)}
-          >
-            <Ionicons name="calendar-outline" size={24} color={colors.primary} />
-            <Text style={styles.dateText}>
-              Start Date: {startDate.toLocaleDateString()}
-            </Text>
-          </TouchableOpacity>
-
-          {showStartDatePicker && (
-            <DateTimePicker
-              value={startDate}
-              mode="date"
-              display="default"
-              onChange={handleStartDateChange}
-              minimumDate={new Date()}
-              // No maximum date - allow selection of any future date
-            />
-          )}
-
-          {/* End Date */}
-          <TouchableOpacity
-            style={styles.dateButton}
-            onPress={() => setShowEndDatePicker(true)}
-          >
-            <Ionicons name="calendar-outline" size={24} color={colors.primary} />
-            <Text style={styles.dateText}>
-              End Date: {endDate.toLocaleDateString()}
-            </Text>
-          </TouchableOpacity>
-
-          {showEndDatePicker && (
-            <DateTimePicker
-              value={endDate}
-              mode="date"
-              display="default"
-              onChange={handleEndDateChange}
-              minimumDate={new Date(startDate.getTime() + 86400000)} // At least 1 day after start date
-              // No maximum date - allow selection of any future date
-            />
-          )}
-
-          {errors.dates && <Text style={styles.errorText}>{errors.dates}</Text>}
-
-          {/* Tender End Date */}
-          {isTender && (
-            <>
-              <Text style={styles.label}>Tender Closing Date</Text>
-              <Text style={styles.helperText}>Select a date on or before the contract start date.</Text>
+              {/* Start Date */}
               <TouchableOpacity
                 style={styles.dateButton}
-                onPress={() => setShowTenderEndDatePicker(true)}
+                onPress={() => setShowStartDatePicker(true)}
               >
-                <Ionicons name="time-outline" size={24} color={colors.primary} />
+                <Ionicons name="calendar-outline" size={24} color={colors.primary} />
                 <Text style={styles.dateText}>
-                  Tender Closes: {tenderEndDate.toLocaleDateString()}
+                  Start Date: {startDate.toLocaleDateString()}
                 </Text>
               </TouchableOpacity>
 
-              {showTenderEndDatePicker && (
+              {showStartDatePicker && (
                 <DateTimePicker
-                  value={tenderEndDate}
+                  value={startDate}
                   mode="date"
                   display="default"
-                  onChange={handleTenderEndDateChange}
+                  onChange={handleStartDateChange}
                   minimumDate={new Date()}
-                  // Allow tender end date to be up to the start date (inclusive)
-                  maximumDate={startDate}
+                  // No maximum date - allow selection of any future date
                 />
               )}
 
-              {errors.tenderEndDate && (
-                <Text style={styles.errorText}>{errors.tenderEndDate}</Text>
+              {/* End Date */}
+              <TouchableOpacity
+                style={styles.dateButton}
+                onPress={() => setShowEndDatePicker(true)}
+              >
+                <Ionicons name="calendar-outline" size={24} color={colors.primary} />
+                <Text style={styles.dateText}>
+                  End Date: {endDate.toLocaleDateString()}
+                </Text>
+              </TouchableOpacity>
+
+              {showEndDatePicker && (
+                <DateTimePicker
+                  value={endDate}
+                  mode="date"
+                  display="default"
+                  onChange={handleEndDateChange}
+                  minimumDate={new Date(startDate.getTime() + 86400000)} // At least 1 day after start date
+                  // No maximum date - allow selection of any future date
+                />
               )}
-            </>
+
+              {errors.dates && <Text style={styles.errorText}>{errors.dates}</Text>}
+
+              {/* Tender End Date */}
+              {isTender && (
+                <>
+                  <Text style={styles.label}>Tender Closing Date</Text>
+                  <Text style={styles.helperText}>Select a date on or before the contract start date.</Text>
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => setShowTenderEndDatePicker(true)}
+                  >
+                    <Ionicons name="time-outline" size={24} color={colors.primary} />
+                    <Text style={styles.dateText}>
+                      Tender Closes: {tenderEndDate.toLocaleDateString()}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {showTenderEndDatePicker && (
+                    <DateTimePicker
+                      value={tenderEndDate}
+                      mode="date"
+                      display="default"
+                      onChange={handleTenderEndDateChange}
+                      minimumDate={new Date()}
+                      // Allow tender end date to be up to the start date (inclusive)
+                      maximumDate={startDate}
+                    />
+                  )}
+
+                  {errors.tenderEndDate && (
+                    <Text style={styles.errorText}>{errors.tenderEndDate}</Text>
+                  )}
+                </>
+              )}
+            </View>
           )}
 
-          {/* Contract Terms */}
-          <Text style={styles.label}>Contract Terms</Text>
-          {errors.terms && <Text style={styles.errorText}>{errors.terms}</Text>}
+          {/* Contract Terms Section */}
+          <SectionHeader
+            title="Contract Terms & Standards"
+            icon="document-text-outline"
+            isExpanded={expandedSections.contractTerms}
+            onToggle={() => toggleSection('contractTerms')}
+            description="Terms, payment, delivery, quality"
+          />
 
-          {terms.map((term, index) => (
-            <View key={index} style={styles.termContainer}>
-              <TextInput
-                style={styles.termInput}
-                value={term}
-                onChangeText={(value) => updateTerm(index, value)}
-                placeholder={`Term ${index + 1}`}
-                multiline
+          {expandedSections.contractTerms && (
+            <View style={styles.sectionContent}>
+              {/* Contract Terms */}
+              <Text style={styles.label}>Contract Terms</Text>
+              {errors.terms && <Text style={styles.errorText}>{errors.terms}</Text>}
+
+              {terms.map((term, index) => (
+                <View key={index} style={styles.termContainer}>
+                  <TextInput
+                    style={styles.termInput}
+                    value={term}
+                    onChangeText={(value) => updateTerm(index, value)}
+                    placeholder={`Term ${index + 1}`}
+                    multiline
+                  />
+
+                  <TouchableOpacity
+                    style={styles.termRemoveButton}
+                    onPress={() => removeTerm(index)}
+                    disabled={terms.length === 1}
+                  >
+                    <Ionicons
+                      name="trash-outline"
+                      size={20}
+                      color={terms.length === 1 ? colors.lightGray : colors.error}
+                    />
+                  </TouchableOpacity>
+                </View>
+              ))}
+
+              <Button
+                title="Add Term"
+                onPress={addTerm}
+                variant="outline"
+                size="small"
+                style={styles.addButton}
+                leftIcon={<Ionicons name="add" size={18} color={colors.primary} />}
               />
 
-              <TouchableOpacity
-                style={styles.termRemoveButton}
-                onPress={() => removeTerm(index)}
-                disabled={terms.length === 1}
-              >
-                <Ionicons
-                  name="trash-outline"
-                  size={20}
-                  color={terms.length === 1 ? colors.lightGray : colors.error}
-                />
-              </TouchableOpacity>
-            </View>
-          ))}
-
-          <Button
-            title="Add Term"
-            onPress={addTerm}
-            variant="outline"
-            size="small"
-            style={styles.addButton}
-            leftIcon={<Ionicons name="add" size={18} color={colors.primary} />}
-          />
-
-          {/* Payment Terms */}
-          <Input
-            label="Payment Terms"
-            value={paymentTerms}
-            onChangeText={setPaymentTerms}
-            placeholder="Specify payment terms"
-            multiline
-            numberOfLines={2}
-          />
-
-          {/* Delivery Terms */}
-          <Input
-            label="Delivery Terms"
-            value={deliveryTerms}
-            onChangeText={setDeliveryTerms}
-            placeholder="Specify delivery terms"
-            multiline
-            numberOfLines={2}
-          />
-
-          {/* Quality Standards */}
-          <Text style={styles.label}>Quality Standards</Text>
-
-          {qualityStandards.map((standard, index) => (
-            <View key={index} style={styles.termContainer}>
-              <TextInput
-                style={styles.termInput}
-                value={standard}
-                onChangeText={(value) => updateQualityStandard(index, value)}
-                placeholder={`Standard ${index + 1}`}
+              {/* Payment Terms */}
+              <Input
+                label="Payment Terms"
+                value={paymentTerms}
+                onChangeText={setPaymentTerms}
+                placeholder="Specify payment terms"
                 multiline
+                numberOfLines={2}
               />
 
-              <TouchableOpacity
-                style={styles.termRemoveButton}
-                onPress={() => removeQualityStandard(index)}
-                disabled={qualityStandards.length === 1}
-              >
-                <Ionicons
-                  name="trash-outline"
-                  size={20}
-                  color={qualityStandards.length === 1 ? colors.lightGray : colors.error}
-                />
-              </TouchableOpacity>
-            </View>
-          ))}
+              {/* Delivery Terms */}
+              <Input
+                label="Delivery Terms"
+                value={deliveryTerms}
+                onChangeText={setDeliveryTerms}
+                placeholder="Specify delivery terms"
+                multiline
+                numberOfLines={2}
+              />
 
-          <Button
-            title="Add Quality Standard"
-            onPress={addQualityStandard}
-            variant="outline"
-            size="small"
-            style={styles.addButton}
-            leftIcon={<Ionicons name="add" size={18} color={colors.primary} />}
-          />
+              {/* Quality Standards */}
+              <Text style={styles.label}>Quality Standards</Text>
+
+              {qualityStandards.map((standard, index) => (
+                <View key={index} style={styles.termContainer}>
+                  <TextInput
+                    style={styles.termInput}
+                    value={standard}
+                    onChangeText={(value) => updateQualityStandard(index, value)}
+                    placeholder={`Standard ${index + 1}`}
+                    multiline
+                  />
+
+                  <TouchableOpacity
+                    style={styles.termRemoveButton}
+                    onPress={() => removeQualityStandard(index)}
+                    disabled={qualityStandards.length === 1}
+                  >
+                    <Ionicons
+                      name="trash-outline"
+                      size={20}
+                      color={qualityStandards.length === 1 ? colors.lightGray : colors.error}
+                    />
+                  </TouchableOpacity>
+                </View>
+              ))}
+
+              <Button
+                title="Add Quality Standard"
+                onPress={addQualityStandard}
+                variant="outline"
+                size="small"
+                style={styles.addButton}
+                leftIcon={<Ionicons name="add" size={18} color={colors.primary} />}
+              />
+            </View>
+          )}
 
           {/* Contract Farming Section */}
           {type === 'farming' && (
             <>
-              <View style={styles.sectionDivider} />
-              <Text style={styles.sectionTitle}>Contract Farming Details</Text>
-              <Text style={styles.sectionDescription}>
-                Specify the details for your farming contract including crop type, land area, and expected yield.
-              </Text>
+              <SectionHeader
+                title="Contract Farming Details"
+                icon="leaf-outline"
+                isExpanded={expandedSections.farmingDetails}
+                onToggle={() => toggleSection('farmingDetails')}
+                description="Crop, practices, quality"
+              />
+
+              {expandedSections.farmingDetails && (
+                <View style={styles.sectionContent}>
 
               {/* Crop Type */}
               <Input
@@ -1263,138 +1312,146 @@ const AddContractScreen = () => {
                 style={styles.addButton}
                 leftIcon={<Ionicons name="add" size={18} color={colors.primary} />}
               />
+                </View>
+              )}
 
               {/* AACC Certification Requirements */}
-              <View style={styles.sectionDivider} />
-              <View style={styles.aaccHeader}>
-                <Ionicons name="shield-checkmark" size={24} color={colors.primary} />
-                <Text style={styles.sectionTitle}>AACC Certification Requirements</Text>
-              </View>
+              <SectionHeader
+                title="AACC Certification Requirements"
+                icon="shield-checkmark"
+                isExpanded={expandedSections.aaccCertification}
+                onToggle={() => toggleSection('aaccCertification')}
+                description="Quality & safety standards"
+              />
 
-              <View style={styles.switchContainer}>
-                <Text style={styles.switchLabel}>Require AACC Certification</Text>
-                <Switch
-                  value={requireAacc}
-                  onValueChange={setRequireAacc}
-                  trackColor={{ false: colors.lightGray, true: colors.primaryLight }}
-                  thumbColor={requireAacc ? colors.primary : colors.gray}
-                />
-              </View>
-
-              {requireAacc && (
-                <>
-                  <Text style={styles.helperText}>
-                    Agricultural and Allied Commodities Certification (AACC) ensures the quality, safety, and authenticity of agricultural products.
-                  </Text>
-
-                  <Text style={styles.label}>Minimum Grade Required</Text>
-                  <View style={styles.gradeContainer}>
-                    {(['A+', 'A', 'B+', 'B', 'C'] as const).map((grade) => (
-                      <TouchableOpacity
-                        key={grade}
-                        style={[
-                          styles.gradeButton,
-                          aaccRequirements.minimumGrade === grade && styles.activeGradeButton
-                        ]}
-                        onPress={() => setAaccRequirements({...aaccRequirements, minimumGrade: grade})}
-                      >
-                        <Text style={[
-                          styles.gradeText,
-                          aaccRequirements.minimumGrade === grade && styles.activeGradeText
-                        ]}>
-                          {grade}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  <View style={styles.row}>
-                    <View style={styles.halfInput}>
-                      <Input
-                        label="Minimum Quality Score (0-100)"
-                        value={aaccRequirements.minimumQualityScore}
-                        onChangeText={(text) => setAaccRequirements({...aaccRequirements, minimumQualityScore: text})}
-                        keyboardType="numeric"
-                        error={errors.minimumQualityScore}
-                      />
-                    </View>
-
-                    <View style={styles.halfInput}>
-                      <Input
-                        label="Minimum Safety Score (0-100)"
-                        value={aaccRequirements.minimumSafetyScore}
-                        onChangeText={(text) => setAaccRequirements({...aaccRequirements, minimumSafetyScore: text})}
-                        keyboardType="numeric"
-                        error={errors.minimumSafetyScore}
-                      />
-                    </View>
-                  </View>
-
-                  <Text style={styles.label}>Required Standards</Text>
-                  <View style={styles.standardsContainer}>
-                    {['Food Safety', 'Quality Assurance', 'Organic', 'Sustainable', 'Fair Trade'].map((standard) => (
-                      <TouchableOpacity
-                        key={standard}
-                        style={[
-                          styles.standardButton,
-                          aaccRequirements.requiredStandards.includes(standard) && styles.activeStandardButton
-                        ]}
-                        onPress={() => {
-                          const updatedStandards = aaccRequirements.requiredStandards.includes(standard)
-                            ? aaccRequirements.requiredStandards.filter(s => s !== standard)
-                            : [...aaccRequirements.requiredStandards, standard];
-                          setAaccRequirements({...aaccRequirements, requiredStandards: updatedStandards});
-                        }}
-                      >
-                        <Text style={[
-                          styles.standardText,
-                          aaccRequirements.requiredStandards.includes(standard) && styles.activeStandardText
-                        ]}>
-                          {standard}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  <Input
-                    label="Testing Laboratory Preferences (Comma Separated)"
-                    placeholder="e.g., National Food Lab, AgriTest, Quality Control Center"
-                    value={aaccRequirements.testingLabPreferences}
-                    onChangeText={(text) => setAaccRequirements({...aaccRequirements, testingLabPreferences: text})}
-                  />
-
-                  <Text style={styles.label}>Certification Cost Coverage</Text>
-                  <View style={styles.costCoverageContainer}>
-                    {(['buyer', 'farmer', 'shared'] as const).map((coverage) => (
-                      <TouchableOpacity
-                        key={coverage}
-                        style={[
-                          styles.coverageButton,
-                          aaccRequirements.certificationCostCoverage === coverage && styles.activeCoverageButton
-                        ]}
-                        onPress={() => setAaccRequirements({...aaccRequirements, certificationCostCoverage: coverage})}
-                      >
-                        <Text style={[
-                          styles.coverageText,
-                          aaccRequirements.certificationCostCoverage === coverage && styles.activeCoverageText
-                        ]}>
-                          {coverage.charAt(0).toUpperCase() + coverage.slice(1)}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  {aaccRequirements.certificationCostCoverage === 'shared' && (
-                    <Input
-                      label="Buyer's Cost Share Percentage (%)"
-                      placeholder="e.g., 50"
-                      value={aaccRequirements.costSharingRatio}
-                      onChangeText={(text) => setAaccRequirements({...aaccRequirements, costSharingRatio: text})}
-                      keyboardType="numeric"
-                      error={errors.costSharingRatio}
+              {expandedSections.aaccCertification && (
+                <View style={styles.sectionContent}>
+                  <View style={styles.switchContainer}>
+                    <Text style={styles.switchLabel}>Require AACC Certification</Text>
+                    <Switch
+                      value={requireAacc}
+                      onValueChange={setRequireAacc}
+                      trackColor={{ false: colors.lightGray, true: colors.primaryLight }}
+                      thumbColor={requireAacc ? colors.primary : colors.gray}
                     />
+                  </View>
+
+                  {requireAacc && (
+                    <>
+                      <Text style={styles.helperText}>
+                        Agricultural and Allied Commodities Certification (AACC) ensures the quality, safety, and authenticity of agricultural products.
+                      </Text>
+
+                      <Text style={styles.label}>Minimum Grade Required</Text>
+                      <View style={styles.gradeContainer}>
+                        {(['A+', 'A', 'B+', 'B', 'C'] as const).map((grade) => (
+                          <TouchableOpacity
+                            key={grade}
+                            style={[
+                              styles.gradeButton,
+                              aaccRequirements.minimumGrade === grade && styles.activeGradeButton
+                            ]}
+                            onPress={() => setAaccRequirements({...aaccRequirements, minimumGrade: grade})}
+                          >
+                            <Text style={[
+                              styles.gradeText,
+                              aaccRequirements.minimumGrade === grade && styles.activeGradeText
+                            ]}>
+                              {grade}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+
+                      <View style={styles.row}>
+                        <View style={styles.halfInput}>
+                          <Input
+                            label="Minimum Quality Score (0-100)"
+                            value={aaccRequirements.minimumQualityScore}
+                            onChangeText={(text) => setAaccRequirements({...aaccRequirements, minimumQualityScore: text})}
+                            keyboardType="numeric"
+                            error={errors.minimumQualityScore}
+                          />
+                        </View>
+
+                        <View style={styles.halfInput}>
+                          <Input
+                            label="Minimum Safety Score (0-100)"
+                            value={aaccRequirements.minimumSafetyScore}
+                            onChangeText={(text) => setAaccRequirements({...aaccRequirements, minimumSafetyScore: text})}
+                            keyboardType="numeric"
+                            error={errors.minimumSafetyScore}
+                          />
+                        </View>
+                      </View>
+
+                      <Text style={styles.label}>Required Standards</Text>
+                      <View style={styles.standardsContainer}>
+                        {['Food Safety', 'Quality Assurance', 'Organic', 'Sustainable', 'Fair Trade'].map((standard) => (
+                          <TouchableOpacity
+                            key={standard}
+                            style={[
+                              styles.standardButton,
+                              aaccRequirements.requiredStandards.includes(standard) && styles.activeStandardButton
+                            ]}
+                            onPress={() => {
+                              const updatedStandards = aaccRequirements.requiredStandards.includes(standard)
+                                ? aaccRequirements.requiredStandards.filter(s => s !== standard)
+                                : [...aaccRequirements.requiredStandards, standard];
+                              setAaccRequirements({...aaccRequirements, requiredStandards: updatedStandards});
+                            }}
+                          >
+                            <Text style={[
+                              styles.standardText,
+                              aaccRequirements.requiredStandards.includes(standard) && styles.activeStandardText
+                            ]}>
+                              {standard}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+
+                      <Input
+                        label="Testing Laboratory Preferences (Comma Separated)"
+                        placeholder="e.g., National Food Lab, AgriTest, Quality Control Center"
+                        value={aaccRequirements.testingLabPreferences}
+                        onChangeText={(text) => setAaccRequirements({...aaccRequirements, testingLabPreferences: text})}
+                      />
+
+                      <Text style={styles.label}>Certification Cost Coverage</Text>
+                      <View style={styles.costCoverageContainer}>
+                        {(['buyer', 'farmer', 'shared'] as const).map((coverage) => (
+                          <TouchableOpacity
+                            key={coverage}
+                            style={[
+                              styles.coverageButton,
+                              aaccRequirements.certificationCostCoverage === coverage && styles.activeCoverageButton
+                            ]}
+                            onPress={() => setAaccRequirements({...aaccRequirements, certificationCostCoverage: coverage})}
+                          >
+                            <Text style={[
+                              styles.coverageText,
+                              aaccRequirements.certificationCostCoverage === coverage && styles.activeCoverageText
+                            ]}>
+                              {coverage.charAt(0).toUpperCase() + coverage.slice(1)}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+
+                      {aaccRequirements.certificationCostCoverage === 'shared' && (
+                        <Input
+                          label="Buyer's Cost Share Percentage (%)"
+                          placeholder="e.g., 50"
+                          value={aaccRequirements.costSharingRatio}
+                          onChangeText={(text) => setAaccRequirements({...aaccRequirements, costSharingRatio: text})}
+                          keyboardType="numeric"
+                          error={errors.costSharingRatio}
+                        />
+                      )}
+                    </>
                   )}
-                </>
+                </View>
               )}
             </>
           )}
@@ -1402,262 +1459,274 @@ const AddContractScreen = () => {
           {/* Structured Bidding Section */}
           {isTender && (
             <>
-              <View style={styles.sectionDivider} />
-              <Text style={styles.sectionTitle}>Structured Bidding</Text>
+              <SectionHeader
+                title="Structured Bidding"
+                icon="options-outline"
+                isExpanded={expandedSections.structuredBidding}
+                onToggle={() => toggleSection('structuredBidding')}
+                description="Bid evaluation parameters"
+              />
 
-              <View style={styles.switchContainer}>
-                <Text style={styles.switchLabel}>Enable Structured Bidding</Text>
-                <Switch
-                  value={enableStructuredBidding}
-                  onValueChange={setEnableStructuredBidding}
-                  trackColor={{ false: colors.lightGray, true: colors.primaryLight }}
-                  thumbColor={enableStructuredBidding ? colors.primary : colors.gray}
-                />
-              </View>
-
-              {enableStructuredBidding && (
-                <>
-                  <Text style={styles.helperText}>
-                    Structured bidding allows you to define specific parameters for evaluating bids beyond just price.
-                  </Text>
-
-                  {/* Bid Parameters */}
-                  <Text style={styles.label}>Bid Parameters</Text>
-                  <Text style={styles.helperText}>Define parameters for bid evaluation (weights must total 100%)</Text>
-                  {errors.bidParameters && <Text style={styles.errorText}>{errors.bidParameters}</Text>}
-                  {errors.bidParametersWeight && <Text style={styles.errorText}>{errors.bidParametersWeight}</Text>}
-
-                  {bidParameters.map((param, index) => (
-                    <View key={index} style={styles.bidParamContainer}>
-                      <View style={styles.row}>
-                        <View style={styles.halfInput}>
-                          <Input
-                            label="Parameter Name"
-                            value={param.name}
-                            onChangeText={(value) => updateBidParameter(index, 'name', value)}
-                            placeholder="e.g., Price, Quality"
-                          />
-                        </View>
-
-                        <View style={styles.halfInput}>
-                          <Input
-                            label="Weight (%)"
-                            value={param.weight}
-                            onChangeText={(value) => updateBidParameter(index, 'weight', value)}
-                            placeholder="e.g., 50"
-                            keyboardType="numeric"
-                          />
-                        </View>
-                      </View>
-
-                      <Input
-                        label="Description"
-                        value={param.description}
-                        onChangeText={(value) => updateBidParameter(index, 'description', value)}
-                        placeholder="Describe what this parameter measures"
-                        multiline
-                      />
-
-                      <View style={styles.row}>
-                        <View style={styles.halfInput}>
-                          <Text style={styles.label}>Parameter Type</Text>
-                          <View style={styles.typeSelector}>
-                            {(['numeric', 'boolean', 'text', 'date'] as const).map((type) => (
-                              <TouchableOpacity
-                                key={type}
-                                style={[
-                                  styles.typeButton,
-                                  param.type === type && styles.activeTypeButton,
-                                  { marginRight: spacing.xs, marginBottom: spacing.xs }
-                                ]}
-                                onPress={() => updateBidParameter(index, 'type', type)}
-                              >
-                                <Text
-                                  style={[
-                                    styles.typeText,
-                                    param.type === type && styles.activeTypeText,
-                                  ]}
-                                >
-                                  {type.charAt(0).toUpperCase() + type.slice(1)}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        </View>
-
-                        <View style={styles.halfInput}>
-                          <View style={styles.checkbox} style={{ marginTop: spacing.lg }}>
-                            <TouchableOpacity
-                              onPress={() => updateBidParameter(index, 'isRequired', !param.isRequired)}
-                            >
-                              <View style={[styles.checkboxBox, param.isRequired && styles.checkboxChecked]}>
-                                {param.isRequired && <Ionicons name="checkmark" size={16} color={colors.white} />}
-                              </View>
-                            </TouchableOpacity>
-                            <Text style={styles.checkboxLabel}>Required Parameter</Text>
-                          </View>
-                        </View>
-                      </View>
-
-                      {param.type === 'numeric' && (
-                        <View style={styles.row}>
-                          <View style={styles.thirdInput}>
-                            <Input
-                              label="Min Value"
-                              value={param.minValue}
-                              onChangeText={(value) => updateBidParameter(index, 'minValue', value)}
-                              placeholder="Min"
-                              keyboardType="numeric"
-                            />
-                          </View>
-
-                          <View style={styles.thirdInput}>
-                            <Input
-                              label="Max Value"
-                              value={param.maxValue}
-                              onChangeText={(value) => updateBidParameter(index, 'maxValue', value)}
-                              placeholder="Max"
-                              keyboardType="numeric"
-                            />
-                          </View>
-
-                          <View style={styles.thirdInput}>
-                            <Input
-                              label="Unit"
-                              value={param.unit}
-                              onChangeText={(value) => updateBidParameter(index, 'unit', value)}
-                              placeholder="e.g., ₹, kg"
-                            />
-                          </View>
-                        </View>
-                      )}
-
-                      <TouchableOpacity
-                        style={styles.removeParameterButton}
-                        onPress={() => removeBidParameter(index)}
-                        disabled={bidParameters.length === 1}
-                      >
-                        <Ionicons
-                          name="trash-outline"
-                          size={20}
-                          color={bidParameters.length === 1 ? colors.lightGray : colors.error}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-
-                  <Button
-                    title="Add Bid Parameter"
-                    onPress={addBidParameter}
-                    variant="outline"
-                    size="small"
-                    style={styles.addButton}
-                    leftIcon={<Ionicons name="add" size={18} color={colors.primary} />}
-                  />
-
-                  {/* Evaluation Method */}
-                  <Text style={styles.label}>Evaluation Method</Text>
-                  <View style={styles.evaluationMethodContainer}>
-                    <TouchableOpacity
-                      style={[
-                        styles.evaluationMethodButton,
-                        evaluationMethod === 'automatic' && styles.activeEvaluationMethodButton,
-                      ]}
-                      onPress={() => setEvaluationMethod('automatic')}
-                    >
-                      <Ionicons
-                        name="calculator-outline"
-                        size={24}
-                        color={evaluationMethod === 'automatic' ? colors.primary : colors.textSecondary}
-                      />
-                      <Text
-                        style={[
-                          styles.evaluationMethodText,
-                          evaluationMethod === 'automatic' && styles.activeEvaluationMethodText,
-                        ]}
-                      >
-                        Automatic
-                      </Text>
-                      <Text style={styles.evaluationMethodDescription}>
-                        System calculates scores based on parameter weights
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.evaluationMethodButton,
-                        evaluationMethod === 'manual' && styles.activeEvaluationMethodButton,
-                      ]}
-                      onPress={() => setEvaluationMethod('manual')}
-                    >
-                      <Ionicons
-                        name="person-outline"
-                        size={24}
-                        color={evaluationMethod === 'manual' ? colors.primary : colors.textSecondary}
-                      />
-                      <Text
-                        style={[
-                          styles.evaluationMethodText,
-                          evaluationMethod === 'manual' && styles.activeEvaluationMethodText,
-                        ]}
-                      >
-                        Manual
-                      </Text>
-                      <Text style={styles.evaluationMethodDescription}>
-                        You'll review and score each bid manually
-                      </Text>
-                    </TouchableOpacity>
+              {expandedSections.structuredBidding && (
+                <View style={styles.sectionContent}>
+                  <View style={styles.switchContainer}>
+                    <Text style={styles.switchLabel}>Enable Structured Bidding</Text>
+                    <Switch
+                      value={enableStructuredBidding}
+                      onValueChange={setEnableStructuredBidding}
+                      trackColor={{ false: colors.lightGray, true: colors.primaryLight }}
+                      thumbColor={enableStructuredBidding ? colors.primary : colors.gray}
+                    />
                   </View>
 
-                  {/* Minimum Qualifications */}
-                  <Text style={styles.label}>Minimum Qualifications (Optional)</Text>
-                  <Text style={styles.helperText}>Define minimum requirements for bidders</Text>
+              {enableStructuredBidding && (
+                    <>
+                      <Text style={styles.helperText}>
+                        Structured bidding allows you to define specific parameters for evaluating bids beyond just price.
+                      </Text>
 
-                  {minimumQualifications.map((qualification, index) => (
-                    <View key={index} style={styles.termContainer}>
-                      <TextInput
-                        style={styles.termInput}
-                        value={qualification}
-                        onChangeText={(value) => updateMinimumQualification(index, value)}
-                        placeholder={`Qualification ${index + 1} (e.g., 3+ years experience)`}
-                        multiline
+                      {/* Bid Parameters */}
+                      <Text style={styles.label}>Bid Parameters</Text>
+                      <Text style={styles.helperText}>Define parameters for bid evaluation (weights must total 100%)</Text>
+                      {errors.bidParameters && <Text style={styles.errorText}>{errors.bidParameters}</Text>}
+                      {errors.bidParametersWeight && <Text style={styles.errorText}>{errors.bidParametersWeight}</Text>}
+
+                      {bidParameters.map((param, index) => (
+                        <View key={index} style={styles.bidParamContainer}>
+                          <View style={styles.row}>
+                            <View style={styles.halfInput}>
+                              <Input
+                                label="Parameter Name"
+                                value={param.name}
+                                onChangeText={(value) => updateBidParameter(index, 'name', value)}
+                                placeholder="e.g., Price, Quality"
+                              />
+                            </View>
+
+                            <View style={styles.halfInput}>
+                              <Input
+                                label="Weight (%)"
+                                value={param.weight}
+                                onChangeText={(value) => updateBidParameter(index, 'weight', value)}
+                                placeholder="e.g., 50"
+                                keyboardType="numeric"
+                              />
+                            </View>
+                          </View>
+
+                          <Input
+                            label="Description"
+                            value={param.description}
+                            onChangeText={(value) => updateBidParameter(index, 'description', value)}
+                            placeholder="Describe what this parameter measures"
+                            multiline
+                          />
+
+                          <View style={styles.row}>
+                            <View style={styles.halfInput}>
+                              <Text style={styles.label}>Parameter Type</Text>
+                              <View style={styles.typeSelector}>
+                                {(['numeric', 'boolean', 'text', 'date'] as const).map((type) => (
+                                  <TouchableOpacity
+                                    key={type}
+                                    style={[
+                                      styles.typeButton,
+                                      param.type === type && styles.activeTypeButton,
+                                      { marginRight: spacing.xs, marginBottom: spacing.xs }
+                                    ]}
+                                    onPress={() => updateBidParameter(index, 'type', type)}
+                                  >
+                                    <Text
+                                      style={[
+                                        styles.typeText,
+                                        param.type === type && styles.activeTypeText,
+                                      ]}
+                                    >
+                                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                                    </Text>
+                                  </TouchableOpacity>
+                                ))}
+                              </View>
+                            </View>
+
+                            <View style={styles.halfInput}>
+                              <View style={styles.checkbox} style={{ marginTop: spacing.lg }}>
+                                <TouchableOpacity
+                                  onPress={() => updateBidParameter(index, 'isRequired', !param.isRequired)}
+                                >
+                                  <View style={[styles.checkboxBox, param.isRequired && styles.checkboxChecked]}>
+                                    {param.isRequired && <Ionicons name="checkmark" size={16} color={colors.white} />}
+                                  </View>
+                                </TouchableOpacity>
+                                <Text style={styles.checkboxLabel}>Required Parameter</Text>
+                              </View>
+                            </View>
+                          </View>
+
+                          {param.type === 'numeric' && (
+                            <View style={styles.row}>
+                              <View style={styles.thirdInput}>
+                                <Input
+                                  label="Min Value"
+                                  value={param.minValue}
+                                  onChangeText={(value) => updateBidParameter(index, 'minValue', value)}
+                                  placeholder="Min"
+                                  keyboardType="numeric"
+                                />
+                              </View>
+
+                              <View style={styles.thirdInput}>
+                                <Input
+                                  label="Max Value"
+                                  value={param.maxValue}
+                                  onChangeText={(value) => updateBidParameter(index, 'maxValue', value)}
+                                  placeholder="Max"
+                                  keyboardType="numeric"
+                                />
+                              </View>
+
+                              <View style={styles.thirdInput}>
+                                <Input
+                                  label="Unit"
+                                  value={param.unit}
+                                  onChangeText={(value) => updateBidParameter(index, 'unit', value)}
+                                  placeholder="e.g., ₹, kg"
+                                />
+                              </View>
+                            </View>
+                          )}
+
+                          <TouchableOpacity
+                            style={styles.removeParameterButton}
+                            onPress={() => removeBidParameter(index)}
+                            disabled={bidParameters.length === 1}
+                          >
+                            <Ionicons
+                              name="trash-outline"
+                              size={20}
+                              color={bidParameters.length === 1 ? colors.lightGray : colors.error}
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+
+                      <Button
+                        title="Add Bid Parameter"
+                        onPress={addBidParameter}
+                        variant="outline"
+                        size="small"
+                        style={styles.addButton}
+                        leftIcon={<Ionicons name="add" size={18} color={colors.primary} />}
                       />
 
-                      <TouchableOpacity
-                        style={styles.termRemoveButton}
-                        onPress={() => removeMinimumQualification(index)}
-                        disabled={minimumQualifications.length === 1}
-                      >
-                        <Ionicons
-                          name="trash-outline"
-                          size={20}
-                          color={minimumQualifications.length === 1 ? colors.lightGray : colors.error}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
+                      {/* Evaluation Method */}
+                      <Text style={styles.label}>Evaluation Method</Text>
+                      <View style={styles.evaluationMethodContainer}>
+                        <TouchableOpacity
+                          style={[
+                            styles.evaluationMethodButton,
+                            evaluationMethod === 'automatic' && styles.activeEvaluationMethodButton,
+                          ]}
+                          onPress={() => setEvaluationMethod('automatic')}
+                        >
+                          <Ionicons
+                            name="calculator-outline"
+                            size={24}
+                            color={evaluationMethod === 'automatic' ? colors.primary : colors.textSecondary}
+                          />
+                          <Text
+                            style={[
+                              styles.evaluationMethodText,
+                              evaluationMethod === 'automatic' && styles.activeEvaluationMethodText,
+                            ]}
+                          >
+                            Automatic
+                          </Text>
+                          <Text style={styles.evaluationMethodDescription}>
+                            System calculates scores based on parameter weights
+                          </Text>
+                        </TouchableOpacity>
 
-                  <Button
-                    title="Add Qualification"
-                    onPress={addMinimumQualification}
-                    variant="outline"
-                    size="small"
-                    style={styles.addButton}
-                    leftIcon={<Ionicons name="add" size={18} color={colors.primary} />}
-                  />
-                </>
+                        <TouchableOpacity
+                          style={[
+                            styles.evaluationMethodButton,
+                            evaluationMethod === 'manual' && styles.activeEvaluationMethodButton,
+                          ]}
+                          onPress={() => setEvaluationMethod('manual')}
+                        >
+                          <Ionicons
+                            name="person-outline"
+                            size={24}
+                            color={evaluationMethod === 'manual' ? colors.primary : colors.textSecondary}
+                          />
+                          <Text
+                            style={[
+                              styles.evaluationMethodText,
+                              evaluationMethod === 'manual' && styles.activeEvaluationMethodText,
+                            ]}
+                          >
+                            Manual
+                          </Text>
+                          <Text style={styles.evaluationMethodDescription}>
+                            You'll review and score each bid manually
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Minimum Qualifications */}
+                      <Text style={styles.label}>Minimum Qualifications (Optional)</Text>
+                      <Text style={styles.helperText}>Define minimum requirements for bidders</Text>
+
+                      {minimumQualifications.map((qualification, index) => (
+                        <View key={index} style={styles.termContainer}>
+                          <TextInput
+                            style={styles.termInput}
+                            value={qualification}
+                            onChangeText={(value) => updateMinimumQualification(index, value)}
+                            placeholder={`Qualification ${index + 1} (e.g., 3+ years experience)`}
+                            multiline
+                          />
+
+                          <TouchableOpacity
+                            style={styles.termRemoveButton}
+                            onPress={() => removeMinimumQualification(index)}
+                            disabled={minimumQualifications.length === 1}
+                          >
+                            <Ionicons
+                              name="trash-outline"
+                              size={20}
+                              color={minimumQualifications.length === 1 ? colors.lightGray : colors.error}
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+
+                      <Button
+                        title="Add Qualification"
+                        onPress={addMinimumQualification}
+                        variant="outline"
+                        size="small"
+                        style={styles.addButton}
+                        leftIcon={<Ionicons name="add" size={18} color={colors.primary} />}
+                      />
+                    </>
+                  )}
+                </View>
               )}
             </>
           )}
 
           {/* Submit Button */}
-          <Button
-            title={isTender ? 'Create Tender' : 'Create Contract'}
-            onPress={handleSubmit}
-            loading={loading}
-            fullWidth
-            style={styles.submitButton}
-          />
+          <View style={styles.submitButtonContainer}>
+            <Button
+              title={isTender ? 'Create Tender' : 'Create Contract'}
+              onPress={handleSubmit}
+              loading={loading}
+              fullWidth
+              style={styles.submitButton}
+              leftIcon={<Ionicons name="checkmark-circle" size={24} color={colors.white} />}
+            />
+          </View>
         </Card>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -1678,6 +1747,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderBottomWidth: 1,
     borderBottomColor: colors.lightGray,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   backButton: {
     width: 40,
@@ -1698,6 +1772,7 @@ const styles = StyleSheet.create({
   },
   formCard: {
     margin: spacing.md,
+    marginTop: spacing.lg,
     borderRadius: borderRadius.lg,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -1705,20 +1780,28 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     alignSelf: 'center',
-    width: '90%',
-    maxWidth: 500,
+    width: '95%',
+    maxWidth: 550,
+    padding: spacing.md,
+    backgroundColor: colors.surfaceLight,
   },
   label: {
     fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily.bold,
     color: colors.textPrimary,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
     marginTop: spacing.md,
+    backgroundColor: colors.veryLightGray,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.sm,
+    alignSelf: 'flex-start',
   },
   typesContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginBottom: spacing.md,
+    justifyContent: 'space-between',
   },
   typeButton: {
     paddingVertical: spacing.sm,
@@ -1728,6 +1811,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     marginRight: spacing.sm,
     marginBottom: spacing.sm,
+    minWidth: '30%',
+    alignItems: 'center',
   },
   activeTypeButton: {
     borderColor: colors.primary,
@@ -1746,6 +1831,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginVertical: spacing.md,
+    backgroundColor: colors.white,
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.veryLightGray,
   },
   switchLabel: {
     fontSize: typography.fontSize.md,
@@ -1764,6 +1854,8 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.regular,
     color: colors.textSecondary,
     marginBottom: spacing.sm,
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.sm,
     fontStyle: 'italic',
   },
   row: {
@@ -1776,13 +1868,18 @@ const styles = StyleSheet.create({
   dateButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.white,
     borderRadius: borderRadius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: colors.lightGray,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
   },
   dateText: {
     fontSize: typography.fontSize.md,
@@ -1800,11 +1897,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.lightGray,
     borderRadius: borderRadius.md,
-    padding: spacing.sm,
+    padding: spacing.md,
     fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily.regular,
     color: colors.textPrimary,
     backgroundColor: colors.white,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
   },
   termRemoveButton: {
     width: 40,
@@ -1823,9 +1925,15 @@ const styles = StyleSheet.create({
     marginTop: -spacing.sm,
     marginBottom: spacing.sm,
   },
+  submitButtonContainer: {
+    marginTop: spacing.xl,
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
+  },
   submitButton: {
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.success,
   },
   loadingContainer: {
     flex: 1,
@@ -1912,12 +2020,17 @@ const styles = StyleSheet.create({
 
   // Quality parameter styles
   qualityParamContainer: {
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.white,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: colors.lightGray,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   parameterInput: {
     marginBottom: spacing.sm,
@@ -1933,12 +2046,17 @@ const styles = StyleSheet.create({
 
   // Payment schedule styles
   paymentScheduleContainer: {
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.white,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: colors.lightGray,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   removeScheduleButton: {
     alignSelf: 'flex-end',
@@ -1947,12 +2065,17 @@ const styles = StyleSheet.create({
 
   // Bid parameter styles
   bidParamContainer: {
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.white,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: colors.lightGray,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   typeSelector: {
     flexDirection: 'row',
@@ -2102,6 +2225,81 @@ const styles = StyleSheet.create({
   activeCoverageText: {
     color: colors.primary,
   },
+
+  // Section header styles
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.lightGray,
+    marginBottom: spacing.lg,
+    backgroundColor: colors.white,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 1,
+    paddingRight: spacing.md,
+  },
+  sectionIcon: {
+    marginRight: spacing.sm,
+  },
+  sectionHeaderTitle: {
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.textPrimary,
+    marginLeft: spacing.xs,
+  },
+  sectionHeaderDescription: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    flexWrap: 'wrap',
+    width: '100%',
+  },
+  sectionContent: {
+    marginBottom: spacing.lg,
+    padding: spacing.md,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.veryLightGray,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
+  },
 });
+
+// Section Header Component
+const SectionHeader = ({ title, icon, isExpanded, onToggle, description }) => {
+  return (
+    <TouchableOpacity style={styles.sectionHeader} onPress={onToggle}>
+      <View style={styles.sectionHeaderLeft}>
+        {icon && <Ionicons name={icon} size={24} color={colors.primary} style={styles.sectionIcon} />}
+        <View style={{ flex: 1 }}>
+          <Text style={styles.sectionHeaderTitle}>{title}</Text>
+          {description && <Text style={styles.sectionHeaderDescription}>{description}</Text>}
+        </View>
+      </View>
+      <Ionicons
+        name={isExpanded ? 'chevron-up' : 'chevron-down'}
+        size={24}
+        color={colors.textSecondary}
+      />
+    </TouchableOpacity>
+  );
+};
 
 export default AddContractScreen;

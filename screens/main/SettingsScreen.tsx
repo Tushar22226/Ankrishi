@@ -10,6 +10,7 @@ import {
   Platform,
   Image,
   Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -22,6 +23,7 @@ import { spacing, typography, borderRadius } from '../../theme';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import { getPlatformTopSpacing } from '../../utils/platformUtils';
+import WalletService from '../../services/WalletService';
 
 const SettingsScreen = () => {
   const navigation = useNavigation();
@@ -33,6 +35,11 @@ const SettingsScreen = () => {
   const [notifications, setNotifications] = useState(true);
   const [locationServices, setLocationServices] = useState(true);
   const [appVersion, setAppVersion] = useState('1.0.0');
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [availableBalance, setAvailableBalance] = useState<number | null>(null);
+  const [heldBalance, setHeldBalance] = useState<number | null>(null);
+  const [pendingEarnings, setPendingEarnings] = useState<number | null>(null);
+  const [loadingWallet, setLoadingWallet] = useState(false);
 
   // Create styles with the current theme colors
   const styles = StyleSheet.create({
@@ -117,6 +124,12 @@ const SettingsScreen = () => {
       color: colors.primary,
       textTransform: 'capitalize',
     },
+    balanceText: {
+      fontSize: typography.fontSize.sm,
+      fontFamily: typography.fontFamily.medium,
+      color: colors.success,
+      marginTop: spacing.xs,
+    },
     settingItem: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -153,6 +166,79 @@ const SettingsScreen = () => {
     logoutButtonText: {
       color: colors.danger,
     },
+    walletCard: {
+      marginBottom: spacing.md,
+      padding: spacing.lg,
+      backgroundColor: colors.white,
+      borderWidth: 1,
+      borderColor: colors.veryLightGray,
+      ...Platform.select({
+        ios: {
+          shadowColor: colors.black,
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+        },
+        android: {
+          elevation: 3,
+        },
+      }),
+    },
+    walletHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: spacing.md,
+      paddingBottom: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.veryLightGray,
+    },
+    walletIcon: {
+      marginRight: spacing.sm,
+      backgroundColor: colors.primaryLight,
+      padding: spacing.sm,
+      borderRadius: borderRadius.round,
+    },
+    walletTitle: {
+      fontSize: typography.fontSize.lg,
+      fontFamily: typography.fontFamily.bold,
+      color: colors.textPrimary,
+    },
+    walletBalance: {
+      fontSize: typography.fontSize.xxl,
+      fontFamily: typography.fontFamily.bold,
+      color: colors.textPrimary,
+      marginVertical: spacing.md,
+      textAlign: 'center',
+    },
+    walletBalanceSmall: {
+      fontSize: typography.fontSize.lg,
+      fontFamily: typography.fontFamily.bold,
+      textAlign: 'center',
+    },
+    walletButtonsContainer: {
+      marginTop: spacing.md,
+    },
+    walletButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.lightGray,
+    },
+    walletButtonLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    walletButtonIcon: {
+      marginRight: spacing.sm,
+    },
+    walletButtonText: {
+      fontSize: typography.fontSize.md,
+      fontFamily: typography.fontFamily.regular,
+      color: colors.textPrimary,
+      marginLeft: spacing.md,
+    },
   });
 
   // Load user preferences from AsyncStorage
@@ -172,6 +258,38 @@ const SettingsScreen = () => {
 
     loadUserPreferences();
   }, []);
+
+  // Load wallet balance
+  useEffect(() => {
+    const loadWalletBalance = async () => {
+      if (!user) return;
+
+      try {
+        setLoadingWallet(true);
+        const balance = await WalletService.getBalance(user.uid);
+        const available = await WalletService.getAvailableBalance(user.uid);
+        const held = await WalletService.getHeldBalance(user.uid);
+
+        // Get pending earnings (for farmers)
+        let pending = 0;
+        if (userProfile?.role === 'farmer') {
+          pending = await WalletService.getPendingEarnings(user.uid);
+        }
+
+        setWalletBalance(balance);
+        setAvailableBalance(available);
+        setHeldBalance(held);
+        setPendingEarnings(pending);
+      } catch (error) {
+        console.error('Error loading wallet balance:', error);
+        Alert.alert('Error', 'Failed to load wallet balance');
+      } finally {
+        setLoadingWallet(false);
+      }
+    };
+
+    loadWalletBalance();
+  }, [user]);
 
   // Save user preferences to AsyncStorage
   const saveUserPreferences = async (key: string, value: any) => {
@@ -237,7 +355,7 @@ const SettingsScreen = () => {
         {
           text: 'Email',
           onPress: () => {
-            Linking.openURL('mailto:support@farmconnect.com');
+            Linking.openURL('mailto:support@ankrishi.com');
           },
         },
         {
@@ -264,8 +382,8 @@ const SettingsScreen = () => {
   const handleTermsConditions = () => {
     Alert.alert(
       'Terms & Conditions',
-      'FarmConnect Terms of Service\n\n' +
-      'By using the FarmConnect app, you agree to our terms of service which include fair usage policies, data privacy, and marketplace rules. For the complete terms, please visit our website.',
+      'ankrishi Terms of Service\n\n' +
+      'By using the ankrishi app, you agree to our terms of service which include fair usage policies, data privacy, and marketplace rules. For the complete terms, please visit our website.',
       [{ text: 'OK' }]
     );
   };
@@ -274,7 +392,7 @@ const SettingsScreen = () => {
   const handlePrivacyPolicy = () => {
     Alert.alert(
       'Privacy Policy',
-      'FarmConnect Privacy Policy\n\n' +
+      'ankrishi Privacy Policy\n\n' +
       'We collect and process your data to provide our services. This includes location data, profile information, and usage statistics. We never sell your personal data to third parties. For the complete privacy policy, please visit our website.',
       [{ text: 'OK' }]
     );
@@ -283,9 +401,9 @@ const SettingsScreen = () => {
   // Handle about
   const handleAbout = () => {
     Alert.alert(
-      'About FarmConnect',
-      `FarmConnect\nVersion ${appVersion}\n\n` +
-      'FarmConnect is a platform designed to empower farmers by connecting them directly with buyers, providing access to resources, and offering AI-powered insights to improve farming practices and financial stability.',
+      'About ankrishi',
+      `ankrishi\nVersion ${appVersion}\n\n` +
+      'ankrishi is a platform designed to empower farmers by connecting them directly with buyers, providing access to resources, and offering AI-powered insights to improve farming practices and financial stability.',
       [{ text: 'OK' }]
     );
   };
@@ -293,6 +411,19 @@ const SettingsScreen = () => {
   // Handle app guide
   const handleAppGuide = () => {
     navigation.navigate('AppGuide' as never);
+  };
+
+  // Handle wallet navigation
+  const handleShowTransactions = () => {
+    navigation.navigate('ShowAllTransaction' as never);
+  };
+
+  const handleAddBalance = () => {
+    navigation.navigate('AddBalance' as never);
+  };
+
+  const handleWithdrawMoney = () => {
+    navigation.navigate('WithdrawMoney' as never);
   };
 
   // Handle logout
@@ -346,6 +477,12 @@ const SettingsScreen = () => {
             <Text style={styles.profileRole}>
               {userProfile?.role ? userProfile.role.charAt(0).toUpperCase() + userProfile.role.slice(1) : 'User'}
             </Text>
+            {walletBalance !== null && (
+              <Text style={styles.balanceText}>
+                Balance: ₹{walletBalance.toFixed(2)}
+                {heldBalance !== null && heldBalance > 0 ? ` (₹${heldBalance.toFixed(2)} on hold)` : ''}
+              </Text>
+            )}
           </View>
         </View>
 
@@ -423,6 +560,78 @@ const SettingsScreen = () => {
     );
   };
 
+  // Render wallet section
+  const renderWalletSection = () => {
+    return (
+      <Card style={styles.walletCard}>
+        <View style={styles.walletHeader}>
+          <View style={styles.walletIcon}>
+            <Ionicons name="wallet-outline" size={24} color={colors.primary} />
+          </View>
+          <Text style={styles.walletTitle}>Ankrishi-Wallet</Text>
+        </View>
+
+        <View style={{ alignItems: 'center' }}>
+          {loadingWallet ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <View style={{width: '100%'}}>
+              <View style={{alignItems: 'center', marginBottom: spacing.sm}}>
+                <Text style={{ fontSize: typography.fontSize.sm, color: colors.textSecondary, marginBottom: spacing.xs }}>Total Balance</Text>
+                <Text style={styles.walletBalance}>₹{walletBalance !== null ? walletBalance.toFixed(2) : '0.00'}</Text>
+              </View>
+
+              <View style={{flexDirection: 'row', justifyContent: 'space-around', marginBottom: spacing.md}}>
+                <View style={{alignItems: 'center'}}>
+                  <Text style={{ fontSize: typography.fontSize.sm, color: colors.textSecondary, marginBottom: spacing.xs }}>Available</Text>
+                  <Text style={[styles.walletBalanceSmall, {color: colors.success}]}>₹{availableBalance !== null ? availableBalance.toFixed(2) : '0.00'}</Text>
+                </View>
+
+                <View style={{alignItems: 'center'}}>
+                  <Text style={{ fontSize: typography.fontSize.sm, color: colors.textSecondary, marginBottom: spacing.xs }}>On Hold</Text>
+                  <Text style={[styles.walletBalanceSmall, {color: colors.warning}]}>₹{heldBalance !== null ? heldBalance.toFixed(2) : '0.00'}</Text>
+                </View>
+
+                {userProfile?.role === 'farmer' && pendingEarnings !== null && pendingEarnings > 0 && (
+                  <View style={{alignItems: 'center'}}>
+                    <Text style={{ fontSize: typography.fontSize.sm, color: colors.textSecondary, marginBottom: spacing.xs }}>Pending</Text>
+                    <Text style={[styles.walletBalanceSmall, {color: '#9C27B0'}]}>₹{pendingEarnings.toFixed(2)}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.walletButtonsContainer}>
+          <TouchableOpacity style={styles.walletButton} onPress={handleShowTransactions}>
+            <View style={styles.walletButtonLeft}>
+              <Ionicons name="list-outline" size={24} color={colors.primary} />
+              <Text style={styles.walletButtonText}>Show All Transactions</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.mediumGray} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.walletButton} onPress={handleAddBalance}>
+            <View style={styles.walletButtonLeft}>
+              <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
+              <Text style={styles.walletButtonText}>Add Balance</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.mediumGray} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.walletButton} onPress={handleWithdrawMoney}>
+            <View style={styles.walletButtonLeft}>
+              <Ionicons name="arrow-down-outline" size={24} color={colors.primary} />
+              <Text style={styles.walletButtonText}>Withdraw Money</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.mediumGray} />
+          </TouchableOpacity>
+        </View>
+      </Card>
+    );
+  };
+
   // Render support section
   const renderSupportSection = () => {
     return (
@@ -492,6 +701,7 @@ const SettingsScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         {renderProfileSection()}
+        {renderWalletSection()}
         {renderAppSettings()}
         {renderSupportSection()}
 

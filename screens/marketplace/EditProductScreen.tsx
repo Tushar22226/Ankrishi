@@ -75,6 +75,8 @@ const EditProductScreen = () => {
   const [stock, setStock] = useState('');
   const [stockUnit, setStockUnit] = useState<StockQuantityUnit>('kg');
   const [ripeness, setRipeness] = useState<ProduceRipeness | ''>('');
+  const [minimumOrderQuantity, setMinimumOrderQuantity] = useState('');
+  const [negotiatedPrice, setNegotiatedPrice] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [existingImages, setExistingImages] = useState<ProductImage[]>([]);
   const [tags, setTags] = useState('');
@@ -83,6 +85,34 @@ const EditProductScreen = () => {
     longitude: number;
     address: string;
   } | null>(null);
+
+  // Certification state
+  const [certifications, setCertifications] = useState<{
+    type: string;
+    isSelected: boolean;
+    certificateImage?: string;
+    certificateUrl?: string;
+  }[]>([
+    { type: 'organic', isSelected: false },
+    { type: 'natural_farming', isSelected: false },
+    { type: 'gmo_free', isSelected: false },
+    { type: 'pesticide_free', isSelected: false },
+    { type: 'fair_trade', isSelected: false },
+    { type: 'aacc', isSelected: false },
+  ]);
+
+  // AACC certification details
+  const [aaccDetails, setAaccDetails] = useState({
+    certificateNumber: '',
+    grade: 'A' as 'A+' | 'A' | 'B+' | 'B' | 'C',
+    qualityScore: '85',
+    safetyScore: '90',
+    authenticityVerified: true,
+    testingLab: '',
+    testingDate: new Date(),
+    standardsCompliance: ['Food Safety', 'Quality Assurance'],
+    showDatePicker: false,
+  });
 
   // UI state
   const [loading, setLoading] = useState(true);
@@ -131,9 +161,52 @@ const EditProductScreen = () => {
       setExistingImages(product.images || []);
       setTags(product.tags?.join(', ') || '');
       setLocation(product.location);
-      // Set ripeness if product is produce
-      if (product.category === 'produce' && 'ripeness' in product) {
-        setRipeness(product.ripeness || '');
+
+      // Load certifications if available
+      if (product.certifications && product.certifications.length > 0) {
+        const updatedCertifications = [...certifications];
+
+        product.certifications.forEach(cert => {
+          const index = updatedCertifications.findIndex(c => c.type === cert.type);
+          if (index !== -1) {
+            updatedCertifications[index] = {
+              ...updatedCertifications[index],
+              isSelected: true,
+              certificateUrl: cert.certificateUrl
+            };
+          }
+        });
+
+        setCertifications(updatedCertifications);
+
+        // Load AACC details if available
+        const aaccCert = product.certifications.find(cert => cert.type === 'aacc');
+        if (aaccCert && aaccCert.aaccDetails) {
+          setAaccDetails({
+            certificateNumber: aaccCert.aaccDetails.certificateNumber || '',
+            grade: aaccCert.aaccDetails.grade || 'A',
+            qualityScore: aaccCert.aaccDetails.qualityScore.toString() || '85',
+            safetyScore: aaccCert.aaccDetails.safetyScore.toString() || '90',
+            authenticityVerified: aaccCert.aaccDetails.authenticityVerified || true,
+            testingLab: aaccCert.aaccDetails.testingLab || '',
+            testingDate: new Date(aaccCert.aaccDetails.testingDate) || new Date(),
+            standardsCompliance: aaccCert.aaccDetails.standardsCompliance || ['Food Safety', 'Quality Assurance'],
+            showDatePicker: false,
+          });
+        }
+      }
+
+      // Set ripeness, minimum order quantity, and negotiated price if product is produce
+      if (product.category === 'produce') {
+        if ('ripeness' in product) {
+          setRipeness(product.ripeness || '');
+        }
+        if ('minimumOrderQuantity' in product) {
+          setMinimumOrderQuantity(product.minimumOrderQuantity?.toString() || '');
+        }
+        if ('negotiatedPrice' in product) {
+          setNegotiatedPrice(product.negotiatedPrice?.toString() || '');
+        }
       }
 
     } catch (error) {
@@ -157,8 +230,7 @@ const EditProductScreen = () => {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
+        allowsEditing: false, // Disabled crop option
         quality: 0.8,
       });
 
@@ -168,6 +240,37 @@ const EditProductScreen = () => {
     } catch (error) {
       console.error('Error selecting image:', error);
       Alert.alert('Error', 'Failed to select image');
+    }
+  };
+
+  // Handle certificate image selection
+  const handleSelectCertificateImage = async (certType: string) => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permissionResult.granted) {
+        Alert.alert('Permission Required', 'Please grant permission to access your photos');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false, // Disabled crop option
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        // Update the certification with the selected image
+        const newCertifications = certifications.map(cert =>
+          cert.type === certType
+            ? { ...cert, certificateImage: result.assets[0].uri }
+            : cert
+        );
+        setCertifications(newCertifications);
+      }
+    } catch (error) {
+      console.error('Error selecting certificate image:', error);
+      Alert.alert('Error', 'Failed to select certificate image');
     }
   };
 
@@ -278,6 +381,19 @@ const EditProductScreen = () => {
       isValid = false;
     }
 
+    // Validate that all selected certifications have certificate images
+    const selectedCertifications = certifications.filter(cert => cert.isSelected);
+    if (selectedCertifications.length > 0) {
+      const missingCertificateImages = selectedCertifications.filter(cert => !cert.certificateImage && !cert.certificateUrl);
+      if (missingCertificateImages.length > 0) {
+        const missingCertNames = missingCertificateImages.map(cert =>
+          cert.type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+        ).join(', ');
+        newErrors.certificationImages = `Certificate images required for: ${missingCertNames}`;
+        isValid = false;
+      }
+    }
+
     setErrors(newErrors);
 
     if (!isValid) {
@@ -314,6 +430,57 @@ const EditProductScreen = () => {
       // Combine existing and new images
       const allImages = [...existingImages, ...uploadedNewImages];
 
+      // Upload certificate images if available
+      const updatedCertifications = await Promise.all(
+        certifications.filter(cert => cert.isSelected).map(async cert => {
+          // Start with existing certification data or create new one
+          let certData = {
+            type: cert.type as CertificationType,
+            issuedBy: userProfile?.displayName || 'Self-certified',
+            issuedDate: Date.now(),
+            expiryDate: Date.now() + (365 * 24 * 60 * 60 * 1000), // 1 year validity
+            verificationCode: Math.random().toString(36).substring(2, 10).toUpperCase(),
+            certificateUrl: cert.certificateUrl, // Keep existing certificate URL if available
+          };
+
+          // Upload new certificate image if available
+          if (cert.certificateImage) {
+            try {
+              // Convert URI to blob
+              const response = await fetch(cert.certificateImage);
+              const blob = await response.blob();
+
+              // Upload to Firebase Storage
+              const certificateUrl = await MarketplaceService.uploadCertificateImage(blob, productId, cert.type);
+              certData.certificateUrl = certificateUrl;
+            } catch (error) {
+              console.error(`Error uploading ${cert.type} certificate image:`, error);
+              // Continue without the certificate image if upload fails
+            }
+          }
+
+          // Add AACC specific details if this is an AACC certification
+          if (cert.type === 'aacc') {
+            return {
+              ...certData,
+              aaccDetails: {
+                certificateNumber: aaccDetails.certificateNumber,
+                grade: aaccDetails.grade,
+                qualityScore: Number(aaccDetails.qualityScore),
+                safetyScore: Number(aaccDetails.safetyScore),
+                authenticityVerified: aaccDetails.authenticityVerified,
+                testingLab: aaccDetails.testingLab,
+                testingDate: aaccDetails.testingDate.getTime(),
+                standardsCompliance: aaccDetails.standardsCompliance,
+                qrCodeUrl: `https://farmconnect.com/verify/${aaccDetails.certificateNumber}`,
+              }
+            };
+          }
+
+          return certData;
+        })
+      );
+
       // Create the updated product object
       const updatedProduct: Partial<Product> = {
         name,
@@ -327,8 +494,12 @@ const EditProductScreen = () => {
         images: allImages,
         location: location!,
         tags: tags.split(',').map(tag => tag.trim()).filter(tag => tag),
-        // Add ripeness for produce category
+        // Add certifications if any selected
+        certifications: updatedCertifications.length > 0 ? updatedCertifications : undefined,
+        // Add ripeness, minimum order quantity, and negotiated price for produce category
         ...(category === 'produce' && ripeness ? { ripeness } : {}),
+        ...(category === 'produce' && minimumOrderQuantity ? { minimumOrderQuantity: parseInt(minimumOrderQuantity, 10) || 0 } : {}),
+        ...(category === 'produce' && negotiatedPrice ? { negotiatedPrice: parseInt(negotiatedPrice, 10) || 0 } : {}),
       };
 
       // Update the product in Firebase
@@ -581,6 +752,37 @@ const EditProductScreen = () => {
               </View>
             </View>
 
+            {/* Minimum Order Quantity for Produce */}
+            {category === 'produce' && (
+              <View style={styles.row}>
+                <View style={styles.fullInput}>
+                  <Input
+                    label="Minimum Order Quantity"
+                    placeholder={`Enter minimum quantity to be purchased (in ${stockUnit})`}
+                    value={minimumOrderQuantity}
+                    onChangeText={setMinimumOrderQuantity}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+            )}
+
+            {/* Negotiated Price for Produce */}
+            {category === 'produce' && (
+              <View style={styles.row}>
+                <View style={styles.fullInput}>
+                  <Input
+                    label={`Negotiated Price per ${stockUnit} (Hidden from buyers)`}
+                    placeholder={`Enter your lowest acceptable price per ${stockUnit}`}
+                    value={negotiatedPrice}
+                    onChangeText={setNegotiatedPrice}
+                    keyboardType="numeric"
+                    helperText="This is the lowest price per unit you're willing to accept through negotiation. This won't be shown to buyers."
+                  />
+                </View>
+              </View>
+            )}
+
             {/* Images */}
             <View style={[styles.sectionHeader, { marginTop: spacing.md }]}>
               <Ionicons name="images" size={24} color={colors.primary} />
@@ -668,6 +870,170 @@ const EditProductScreen = () => {
             {errors.location ? (
               <Text style={styles.errorText}>{errors.location}</Text>
             ) : null}
+
+            {/* Certifications */}
+            <View style={[styles.sectionHeader, { marginTop: spacing.md }]}>
+              <Ionicons name="ribbon" size={24} color={colors.primary} />
+              <Text style={styles.sectionTitle}>Certifications</Text>
+            </View>
+            <View style={styles.divider} />
+
+            <Text style={styles.label}>Select applicable certifications</Text>
+            <View style={styles.certificationsContainer}>
+              {certifications.map((cert, index) => (
+                <TouchableOpacity
+                  key={cert.type}
+                  style={[
+                    styles.certificationButton,
+                    cert.isSelected && styles.certificationButtonActive
+                  ]}
+                  onPress={() => {
+                    const newCertifications = [...certifications];
+                    newCertifications[index].isSelected = !newCertifications[index].isSelected;
+                    setCertifications(newCertifications);
+                  }}
+                >
+                  <View style={styles.certCheckbox}>
+                    {cert.isSelected && (
+                      <Ionicons name="checkmark" size={16} color={colors.white} />
+                    )}
+                  </View>
+                  <Text style={[
+                    styles.certificationText,
+                    cert.isSelected && styles.certificationTextActive
+                  ]}>
+                    {cert.type.split('_').map(word =>
+                      word.charAt(0).toUpperCase() + word.slice(1)
+                    ).join(' ')}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.helperText}>
+              Certified products appear in special categories and get premium visibility
+            </Text>
+
+            {/* Certificate Images for Selected Certifications */}
+            {certifications.filter(cert => cert.isSelected).map((cert) => (
+              <View key={`${cert.type}-image`} style={styles.certificateImageContainer}>
+                <Text style={styles.certificateImageLabel}>
+                  {cert.type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')} Certificate Image
+                  <Text style={styles.requiredStar}> *</Text>
+                </Text>
+
+                {cert.certificateUrl && (
+                  <View style={styles.existingCertificateContainer}>
+                    <Text style={styles.existingCertificateText}>Existing Certificate:</Text>
+                    <Image source={{ uri: cert.certificateUrl }} style={styles.certificateImage} />
+                  </View>
+                )}
+
+                {cert.certificateImage ? (
+                  <View style={styles.selectedCertificateContainer}>
+                    <Text style={styles.newCertificateText}>New Certificate:</Text>
+                    <Image source={{ uri: cert.certificateImage }} style={styles.certificateImage} />
+                    <TouchableOpacity
+                      style={styles.removeCertificateButton}
+                      onPress={() => {
+                        const newCertifications = certifications.map(c =>
+                          c.type === cert.type ? { ...c, certificateImage: undefined } : c
+                        );
+                        setCertifications(newCertifications);
+                      }}
+                    >
+                      <Ionicons name="close-circle" size={24} color={colors.error} />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.addCertificateButton, !cert.certificateImage && !cert.certificateUrl && styles.requiredCertificateButton]}
+                    onPress={() => handleSelectCertificateImage(cert.type)}
+                  >
+                    <Ionicons name="camera" size={24} color={colors.primary} />
+                    <Text style={styles.addCertificateText}>{cert.certificateUrl ? 'Update Certificate' : 'Upload Certificate'}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+
+            {errors.certificationImages ? (
+              <Text style={styles.errorText}>{errors.certificationImages}</Text>
+            ) : null}
+
+            {/* AACC Certification Details */}
+            {certifications.find(cert => cert.type === 'aacc')?.isSelected && (
+              <View style={styles.aaccContainer}>
+                <View style={styles.aaccHeader}>
+                  <Ionicons name="shield-checkmark" size={24} color={colors.primary} />
+                  <Text style={styles.aaccTitle}>AACC Certification Details</Text>
+                </View>
+
+                <Text style={styles.aaccDescription}>
+                  Agricultural and Allied Commodities Certification (AACC) verifies the quality, safety, and authenticity of your products.
+                </Text>
+
+                <Input
+                  label="Certificate Number"
+                  placeholder="Enter AACC certificate number"
+                  value={aaccDetails.certificateNumber}
+                  onChangeText={(text) => setAaccDetails({...aaccDetails, certificateNumber: text})}
+                  error={errors.aaccCertificateNumber}
+                  touched={true}
+                />
+
+                <Text style={styles.label}>Certificate Grade</Text>
+                <View style={styles.gradeContainer}>
+                  {(['A+', 'A', 'B+', 'B', 'C'] as const).map((grade) => (
+                    <TouchableOpacity
+                      key={grade}
+                      style={[
+                        styles.gradeButton,
+                        aaccDetails.grade === grade && styles.activeGradeButton
+                      ]}
+                      onPress={() => setAaccDetails({...aaccDetails, grade})}
+                    >
+                      <Text style={[
+                        styles.gradeText,
+                        aaccDetails.grade === grade && styles.activeGradeText
+                      ]}>
+                        {grade}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <View style={styles.row}>
+                  <View style={styles.halfInput}>
+                    <Input
+                      label="Quality Score (0-100)"
+                      placeholder="Enter quality score"
+                      value={aaccDetails.qualityScore}
+                      onChangeText={(text) => setAaccDetails({...aaccDetails, qualityScore: text})}
+                      keyboardType="numeric"
+                    />
+                  </View>
+
+                  <View style={styles.halfInput}>
+                    <Input
+                      label="Safety Score (0-100)"
+                      placeholder="Enter safety score"
+                      value={aaccDetails.safetyScore}
+                      onChangeText={(text) => setAaccDetails({...aaccDetails, safetyScore: text})}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+
+                <Input
+                  label="Testing Laboratory"
+                  placeholder="Enter testing laboratory name"
+                  value={aaccDetails.testingLab}
+                  onChangeText={(text) => setAaccDetails({...aaccDetails, testingLab: text})}
+                  error={errors.aaccTestingLab}
+                  touched={true}
+                />
+              </View>
+            )}
 
             {/* Tags */}
             <View style={[styles.sectionHeader, { marginTop: spacing.md }]}>
@@ -969,6 +1335,181 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.regular,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+
+  // Certification Styles
+  certificationsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: spacing.md,
+  },
+  certificationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginRight: spacing.sm,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.lightGray,
+  },
+  certificationButtonActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
+  },
+  certCheckbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    marginRight: spacing.xs,
+  },
+  certificationText: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.textSecondary,
+  },
+  certificationTextActive: {
+    color: colors.primary,
+  },
+  helperText: {
+    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+  },
+  certificateImageContainer: {
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  certificateImageLabel: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  existingCertificateContainer: {
+    marginBottom: spacing.md,
+  },
+  existingCertificateText: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  newCertificateText: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  selectedCertificateContainer: {
+    position: 'relative',
+    width: '100%',
+    height: 200,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.lightGray,
+    marginBottom: spacing.md,
+  },
+  certificateImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  removeCertificateButton: {
+    position: 'absolute',
+    top: spacing.xs,
+    right: spacing.xs,
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    padding: 2,
+  },
+  addCertificateButton: {
+    width: '100%',
+    height: 120,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.primary,
+    borderRadius: borderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceLight,
+  },
+  requiredCertificateButton: {
+    borderColor: colors.error,
+    backgroundColor: 'rgba(255, 0, 0, 0.05)',
+  },
+  addCertificateText: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.primary,
+    marginTop: spacing.xs,
+  },
+  requiredStar: {
+    color: colors.error,
+    fontFamily: typography.fontFamily.bold,
+  },
+
+  // AACC Styles
+  aaccContainer: {
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.lightGray,
+  },
+  aaccHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  aaccTitle: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.textPrimary,
+    marginLeft: spacing.xs,
+  },
+  aaccDescription: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+  },
+  gradeContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: spacing.md,
+  },
+  gradeButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.lightGray,
+    marginRight: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  activeGradeButton: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  gradeText: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.textPrimary,
+  },
+  activeGradeText: {
+    color: colors.white,
   },
   errorText: {
     fontSize: typography.fontSize.sm,

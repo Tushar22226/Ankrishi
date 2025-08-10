@@ -7,8 +7,6 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
-  Platform,
-  PermissionsAndroid,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -105,37 +103,29 @@ const ContractOverview: React.FC<ContractOverviewProps> = ({ contract, onUpdateS
     });
   };
 
-  // Modern Android permission handling
-  const requestModernStoragePermission = async (): Promise<boolean> => {
-    if (Platform.OS !== 'android') {
-      return true; // iOS doesn't need runtime permission for this
-    }
-
-    try {
-      // For Android 13+ (API level 33+), we don't need to request storage permissions
-      // for PDF generation as the files are created in the app-specific directory
-      // and shared via content:// URIs
-      console.log('Using modern Android storage approach - no explicit permission needed');
-      return true;
-    } catch (error) {
-      console.error('Error with storage permission check:', error);
-      return true; // Proceed anyway as modern Android doesn't require explicit permission
-    }
-  };
-
   // Handle PDF generation
   const handleGeneratePdf = async () => {
     try {
       setGeneratingPdf(true);
 
-      // Check modern storage approach (no explicit permission needed for Android 13+)
-      await requestModernStoragePermission();
+      // Show loading message
+      Alert.alert(
+        'Generating PDF',
+        'Please wait while we generate your contract PDF. This may take a moment.',
+        [{ text: 'OK' }]
+      );
 
-      // Generate and share the PDF
-      await ContractPDFService.generateContractPDF(contract);
+      // Generate the PDF and get the download URL
+      const pdfUrl = await ContractPDFService.generateContractPDF(contract);
 
-      // No need for an alert as the Share dialog will appear
-      console.log('PDF generation and sharing process completed');
+      // Show success message with the URL
+      Alert.alert(
+        'PDF Generated Successfully',
+        'Your contract PDF has been generated and saved to your documents. You can view it in the Document Management screen.',
+        [{ text: 'OK' }]
+      );
+
+      console.log('PDF generation completed with URL:', pdfUrl);
     } catch (error) {
       console.error('Error generating PDF:', error);
       Alert.alert(
@@ -246,7 +236,7 @@ const ContractOverview: React.FC<ContractOverviewProps> = ({ contract, onUpdateS
         <View style={styles.partySeparator} />
 
         <View style={styles.partyContainer}>
-          <View style={[styles.partyIcon, { backgroundColor: colors.accent }]}>
+          <View style={[styles.partyIcon, { backgroundColor: colors.primary }]}>
             <Ionicons name="person" size={24} color={colors.white} />
           </View>
           <View style={styles.partyDetails}>
@@ -276,7 +266,6 @@ const ContractOverview: React.FC<ContractOverviewProps> = ({ contract, onUpdateS
                 title="Mark as Completed"
                 onPress={() => onUpdateStatus('completed')}
                 style={styles.actionButton}
-                variant="outline"
               />
 
               <Button
@@ -306,18 +295,18 @@ const ContractOverview: React.FC<ContractOverviewProps> = ({ contract, onUpdateS
             />
           )}
 
-          {/* PDF Share Button */}
+          {/* PDF Generation Button */}
           <Button
-            title={generatingPdf ? "Generating PDF..." : "Share as PDF"}
+            title={generatingPdf ? "Generating PDF..." : "Generate Contract PDF"}
             onPress={handleGeneratePdf}
             disabled={generatingPdf}
-            icon="share-outline"
+            icon="document-text-outline"
             style={styles.pdfButton}
             variant="outline"
             leftIcon={
               generatingPdf ?
                 <ActivityIndicator size="small" color={colors.primary} /> :
-                <Ionicons name="share-outline" size={20} color={colors.primary} />
+                <Ionicons name="document-text-outline" size={20} color={colors.primary} />
             }
           />
         </View>
@@ -369,7 +358,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: colors.success,
+    backgroundColor: colors.primary,
     borderRadius: borderRadius.full,
   },
   progressCompleted: {
@@ -444,7 +433,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   cancelButton: {
-    borderColor: colors.error,
+    borderColor: colors.primary,
   },
   pdfButton: {
     marginTop: spacing.md,

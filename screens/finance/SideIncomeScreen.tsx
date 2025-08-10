@@ -102,7 +102,7 @@ const SideIncomeScreen = () => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       setLocationPermission(status === 'granted');
-      
+
       if (status === 'granted') {
         const currentLocation = await Location.getCurrentPositionAsync({});
         setLocation(currentLocation);
@@ -128,7 +128,7 @@ const SideIncomeScreen = () => {
 
       // Create transport applicant entry in database
       const applicantRef = database().ref('transport_applicants').push();
-      
+
       await applicantRef.set({
         userId: userProfile.uid,
         name: userProfile.displayName || '',
@@ -159,7 +159,7 @@ const SideIncomeScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
@@ -169,44 +169,72 @@ const SideIncomeScreen = () => {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.contentContainer}>
-        {/* Transportation Question */}
-        <Card style={styles.transportationCard}>
-          <Text style={styles.transportationTitle}>Do you have a transportation vehicle?</Text>
-          <Text style={styles.transportationDescription}>
-            (Car, motorcycle, bicycle, or any other vehicle that can be used for transportation)
-          </Text>
-          
-          <View style={styles.switchContainer}>
-            <Text style={styles.switchLabel}>{hasTransportation ? 'Yes' : 'No'}</Text>
-            <Switch
-              value={hasTransportation}
-              onValueChange={setHasTransportation}
-              trackColor={{ false: colors.lightGray, true: colors.primaryLight }}
-              thumbColor={hasTransportation ? colors.primary : colors.mediumGray}
-            />
+      <ScrollView
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Main Card with Transportation Question */}
+        <Card style={styles.mainCard}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="bicycle" size={28} color={colors.primary} style={styles.cardHeaderIcon} />
+            <Text style={styles.cardHeaderTitle}>Delivery Partner Program</Text>
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* Transportation Question */}
+          <View style={styles.questionSection}>
+            <Text style={styles.transportationTitle}>Do you have a transportation vehicle?</Text>
+            <Text style={styles.transportationDescription}>
+              (Car, motorcycle, bicycle, or any other vehicle that can be used for transportation)
+            </Text>
+
+            <View style={styles.switchContainer}>
+              <Text style={[styles.switchLabel, hasTransportation && styles.activeText]}>
+                {hasTransportation ? 'Yes' : 'No'}
+              </Text>
+              <Switch
+                value={hasTransportation}
+                onValueChange={setHasTransportation}
+                trackColor={{ false: colors.lightGray, true: colors.primaryLight }}
+                thumbColor={hasTransportation ? colors.primary : colors.mediumGray}
+                style={styles.switch}
+              />
+            </View>
           </View>
 
           {hasTransportation && (
             <View style={styles.opportunityContainer}>
               <View style={styles.opportunityHeader}>
-                <Ionicons name="star" size={24} color={colors.secondary} />
+                <Ionicons name="star" size={28} color={colors.secondary} />
                 <Text style={styles.opportunityHeaderText}>Great Opportunity!</Text>
               </View>
-              
+
               <Text style={styles.opportunityDescription}>
-                You have a great opportunity to work with us as a delivery partner. 
+                You have a great opportunity to work with us as a delivery partner.
                 Earn extra income by delivering farm products to customers in your area.
               </Text>
+
+              <View style={styles.benefitsRow}>
+                <View style={styles.benefitBadge}>
+                  <Ionicons name="time-outline" size={16} color={colors.white} />
+                  <Text style={styles.benefitBadgeText}>Flexible Hours</Text>
+                </View>
+                <View style={styles.benefitBadge}>
+                  <Ionicons name="cash-outline" size={16} color={colors.white} />
+                  <Text style={styles.benefitBadgeText}>Extra Income</Text>
+                </View>
+              </View>
 
               <Button
                 title={isApplying ? "Applying..." : "Apply Now"}
                 onPress={handleApplyNow}
                 style={styles.applyButton}
                 disabled={isApplying}
-                leftIcon={isApplying ? 
-                  <ActivityIndicator size="small" color={colors.white} /> : 
-                  <Ionicons name="checkmark-circle" size={18} color={colors.white} />
+                leftIcon={isApplying ?
+                  <ActivityIndicator size="small" color={colors.white} /> :
+                  <Ionicons name="checkmark-circle" size={20} color={colors.white} />
                 }
               />
             </View>
@@ -214,38 +242,43 @@ const SideIncomeScreen = () => {
         </Card>
 
         {/* Side Income Opportunities */}
-        <Text style={styles.sectionTitle}>Explore Side Income Opportunities</Text>
-        
+        <View style={styles.sectionTitleContainer}>
+          <Ionicons name="cash" size={24} color={colors.primary} style={styles.sectionTitleIcon} />
+          <Text style={styles.sectionTitle}>Explore Side Income Opportunities</Text>
+        </View>
+
         {sideIncomeOpportunities.map((opportunity) => (
           <Card key={opportunity.id} style={styles.opportunityCard}>
             <View style={styles.opportunityIconContainer}>
               <Ionicons name={opportunity.icon as any} size={32} color={colors.white} />
             </View>
-            
+
             <View style={styles.opportunityContent}>
               <Text style={styles.opportunityTitle}>{opportunity.title}</Text>
               <Text style={styles.opportunitySubtitle}>{opportunity.description}</Text>
-              
+
               <View style={styles.earningsContainer}>
-                <Ionicons name="cash-outline" size={16} color={colors.success} />
+                <Ionicons name="cash-outline" size={18} color={colors.success} />
                 <Text style={styles.earningsText}>Potential earnings: {opportunity.earnings}</Text>
               </View>
-              
-              <Text style={styles.requirementsTitle}>Requirements:</Text>
-              {opportunity.requirements.map((req, index) => (
-                <View key={index} style={styles.requirementItem}>
-                  <Ionicons name="checkmark-circle" size={14} color={colors.primary} />
-                  <Text style={styles.requirementText}>{req}</Text>
-                </View>
-              ))}
-              
-              <Text style={styles.benefitsTitle}>Benefits:</Text>
-              {opportunity.benefits.map((benefit, index) => (
-                <View key={index} style={styles.benefitItem}>
-                  <Ionicons name="arrow-forward" size={14} color={colors.secondary} />
-                  <Text style={styles.benefitText}>{benefit}</Text>
-                </View>
-              ))}
+
+              <View style={styles.infoContainer}>
+                <Text style={styles.requirementsTitle}>Requirements:</Text>
+                {opportunity.requirements.map((req, index) => (
+                  <View key={index} style={styles.requirementItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                    <Text style={styles.requirementText}>{req}</Text>
+                  </View>
+                ))}
+
+                <Text style={styles.benefitsTitle}>Benefits:</Text>
+                {opportunity.benefits.map((benefit, index) => (
+                  <View key={index} style={styles.benefitItem}>
+                    <Ionicons name="arrow-forward" size={16} color={colors.secondary} />
+                    <Text style={styles.benefitText}>{benefit}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
           </Card>
         ))}
@@ -257,16 +290,199 @@ const SideIncomeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    marginTop:40,
     backgroundColor: colors.background,
+    ...Platform.select({
+      android: {
+        paddingTop: 8,
+      },
+    }),
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.medium,
-    paddingTop: getPlatformTopSpacing() + spacing.medium,
-    paddingBottom: spacing.medium,
+    paddingHorizontal: 16,
+    paddingTop: getPlatformTopSpacing() + 12,
+    paddingBottom: 12,
     backgroundColor: colors.white,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 4,
+        marginBottom: 4,
+      },
+    }),
+  },
+  backButton: {
+    padding: 8,
+    marginLeft: -4,
+  },
+  headerTitle: {
+    ...typography.h2,
+    color: colors.textPrimary,
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  contentContainer: {
+    padding: 14,
+    paddingBottom: 80,
+  },
+  mainCard: {
+    padding: 0,
+    marginBottom: 20,
+    borderRadius: 12,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundLight,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  cardHeaderIcon: {
+    marginRight: 12,
+  },
+  cardHeaderTitle: {
+    ...typography.h3,
+    color: colors.primary,
+    fontWeight: '600',
+    fontSize: 18,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.lightGray,
+    marginHorizontal: 0,
+  },
+  questionSection: {
+    padding: 16,
+  },
+  transportationTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    marginBottom: 8,
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  transportationDescription: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginBottom: 16,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    marginTop: 8,
+  },
+  switchLabel: {
+    ...typography.body,
+    fontWeight: '500',
+    color: colors.textPrimary,
+    fontSize: 16,
+  },
+  activeText: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  switch: {
+    transform: [{ scaleX: 1.1 }, { scaleY: 1.1 }],
+  },
+  opportunityContainer: {
+    marginTop: 0,
+    padding: 16,
+    backgroundColor: colors.backgroundLight,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  opportunityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  opportunityHeaderText: {
+    ...typography.h3,
+    color: colors.secondary,
+    marginLeft: 10,
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  opportunityDescription: {
+    ...typography.body,
+    color: colors.textPrimary,
+    marginBottom: 16,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  benefitsRow: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    marginTop: 4,
+  },
+  benefitBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.secondary,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  benefitBadgeText: {
+    color: colors.white,
+    fontWeight: '500',
+    fontSize: 13,
+    marginLeft: 6,
+  },
+  applyButton: {
+    backgroundColor: colors.success,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  sectionTitleIcon: {
+    marginRight: 10,
+  },
+  sectionTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  opportunityCard: {
+    flexDirection: 'row',
+    padding: 16,
+    marginBottom: 16,
+    borderRadius: 12,
     ...Platform.select({
       ios: {
         shadowColor: colors.shadow,
@@ -279,145 +495,90 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  backButton: {
-    padding: spacing.small,
-  },
-  headerTitle: {
-    ...typography.h2,
-    color: colors.textPrimary,
-  },
-  scrollContainer: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: spacing.medium,
-    paddingBottom: spacing.extraLarge,
-  },
-  sectionTitle: {
-    ...typography.h3,
-    color: colors.textPrimary,
-    marginTop: spacing.large,
-    marginBottom: spacing.medium,
-  },
-  transportationCard: {
-    padding: spacing.medium,
-    marginBottom: spacing.medium,
-  },
-  transportationTitle: {
-    ...typography.h3,
-    color: colors.textPrimary,
-    marginBottom: spacing.small,
-  },
-  transportationDescription: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginBottom: spacing.medium,
-  },
-  switchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.medium,
-  },
-  switchLabel: {
-    ...typography.body,
-    fontWeight: '500',
-    color: colors.textPrimary,
-  },
-  opportunityContainer: {
-    marginTop: spacing.medium,
-    padding: spacing.medium,
-    backgroundColor: colors.backgroundLight,
-    borderRadius: borderRadius.medium,
-  },
-  opportunityHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.small,
-  },
-  opportunityHeaderText: {
-    ...typography.h3,
-    color: colors.secondary,
-    marginLeft: spacing.small,
-  },
-  opportunityDescription: {
-    ...typography.body,
-    color: colors.textPrimary,
-    marginBottom: spacing.medium,
-  },
-  applyButton: {
-    backgroundColor: colors.success,
-  },
-  opportunityCard: {
-    flexDirection: 'row',
-    padding: spacing.medium,
-    marginBottom: spacing.medium,
-  },
   opportunityIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.medium,
+    marginRight: 16,
   },
   opportunityContent: {
     flex: 1,
+    paddingRight: 4,
   },
   opportunityTitle: {
     ...typography.h3,
     color: colors.textPrimary,
-    marginBottom: spacing.tiny,
+    marginBottom: 4,
+    fontSize: 17,
+    fontWeight: '600',
   },
   opportunitySubtitle: {
     ...typography.body,
     color: colors.textSecondary,
-    marginBottom: spacing.small,
+    marginBottom: 10,
+    fontSize: 14,
+    lineHeight: 20,
   },
   earningsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.small,
+    marginBottom: 12,
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
   },
   earningsText: {
     ...typography.body,
     color: colors.success,
-    fontWeight: '500',
-    marginLeft: spacing.tiny,
+    fontWeight: '600',
+    marginLeft: 8,
+    fontSize: 14,
+  },
+  infoContainer: {
+    marginTop: 4,
   },
   requirementsTitle: {
     ...typography.subtitle,
     color: colors.textPrimary,
     fontWeight: '600',
-    marginBottom: spacing.tiny,
+    marginBottom: 8,
+    fontSize: 15,
   },
   requirementItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.tiny,
+    marginBottom: 6,
   },
   requirementText: {
     ...typography.body,
     color: colors.textPrimary,
-    marginLeft: spacing.tiny,
+    marginLeft: 8,
+    fontSize: 14,
+    flex: 1,
   },
   benefitsTitle: {
     ...typography.subtitle,
     color: colors.textPrimary,
     fontWeight: '600',
-    marginTop: spacing.small,
-    marginBottom: spacing.tiny,
+    marginTop: 12,
+    marginBottom: 8,
+    fontSize: 15,
   },
   benefitItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.tiny,
+    marginBottom: 6,
   },
   benefitText: {
     ...typography.body,
     color: colors.textPrimary,
-    marginLeft: spacing.tiny,
+    marginLeft: 8,
+    fontSize: 14,
+    flex: 1,
   },
 });
 

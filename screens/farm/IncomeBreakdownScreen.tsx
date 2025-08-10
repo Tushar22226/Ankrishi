@@ -165,7 +165,7 @@ const IncomeBreakdownScreen = () => {
         {/* Add Income Button */}
         <Button
           title="Add New Income"
-          onPress={() => navigation.navigate('AddIncome' as never)}
+          onPress={() => navigation.navigate('AddIncome')}
           style={styles.addButton}
           leftIcon={<Ionicons name="add-circle" size={20} color={colors.white} />}
         />

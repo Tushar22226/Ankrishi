@@ -2,7 +2,7 @@
 export type ProductCategory = 'fertilizer' | 'equipment' | 'produce';
 
 // Stock quantity units
-export type StockQuantityUnit = 'kg' | 'quintal' | 'ton' | 'piece' | 'dozen' | 'box' | 'packet';
+export type StockQuantityUnit = 'kg' | 'quintal' | 'ton' | 'g' | 'l' | 'ml' | 'piece' | 'dozen' | 'box' | 'packet' | 'unit' | 'bag';
 export type ProductSubcategory =
   // Fertilizer subcategories
   | 'organic' | 'chemical' | 'biofertilizer'
@@ -78,6 +78,8 @@ export interface Product {
   availabilityMode?: ProductAvailabilityMode; // Indicates how the product can be obtained (default: 'all')
   // Direct farmer-to-buyer fields
   isDirectFromFarmer?: boolean; // Indicates if this product is sold directly by a farmer
+  negotiatedPrice?: number; // The lowest price the farmer is willing to accept (hidden from buyers)
+  minimumOrderQuantity?: number; // Minimum quantity that must be ordered
   farmDetails?: {
     farmName?: string;
     farmingMethod?: 'conventional' | 'organic' | 'natural';
@@ -254,6 +256,8 @@ export interface OrderItem {
   rentalPeriod?: RentalPeriod;
   rentalStartDate?: number;
   rentalEndDate?: number;
+  isNegotiated?: boolean;
+  negotiatedPrice?: number;
 }
 
 // Order interface

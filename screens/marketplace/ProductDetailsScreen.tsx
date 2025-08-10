@@ -8,6 +8,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Modal,
+  TextInput,
+  Linking,
 } from 'react-native';
 import database from '@react-native-firebase/database';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,11 +37,26 @@ const ProductDetailsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [product, setProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [showQuantityDialog, setShowQuantityDialog] = useState(false);
+  const [customQuantity, setCustomQuantity] = useState('');
+  const [showNegotiateDialog, setShowNegotiateDialog] = useState(false);
+  const [negotiatedPrice, setNegotiatedPrice] = useState('');
+  const [isMinimumQuantitySatisfied, setIsMinimumQuantitySatisfied] = useState(true);
+  const [isOutOfStock, setIsOutOfStock] = useState(false);
 
   // Load product details
   useEffect(() => {
     loadProductDetails();
   }, [productId]);
+
+  // Check if minimum quantity requirement is satisfied
+  useEffect(() => {
+    if (product && product.category === 'produce' && product.minimumOrderQuantity) {
+      setIsMinimumQuantitySatisfied(quantity >= product.minimumOrderQuantity);
+    } else {
+      setIsMinimumQuantitySatisfied(true);
+    }
+  }, [product, quantity]);
 
   // Load product details from Firebase
   const loadProductDetails = async () => {
@@ -79,6 +97,9 @@ const ProductDetailsScreen = () => {
 
       // Set the product data
       setProduct(sanitizedProduct);
+
+      // Check if product is out of stock
+      setIsOutOfStock(sanitizedProduct.stock <= 0);
 
       // If this is a direct-from-farmer product, fetch additional farmer details
       if (sanitizedProduct.isDirectFromFarmer && sanitizedProduct.sellerId) {
@@ -144,9 +165,21 @@ const ProductDetailsScreen = () => {
         return;
       }
 
-      // Check if product is in stock
-      if (!product || product.stock < quantity) {
-        Alert.alert('Error', 'Product is out of stock or not available in the requested quantity');
+      // Check if product is out of stock
+      if (!product || product.stock <= 0) {
+        Alert.alert('Error', 'Product is out of stock');
+        return;
+      }
+
+      // Check if product is available in the requested quantity
+      if (product.stock < quantity) {
+        Alert.alert('Error', 'Product is not available in the requested quantity');
+        return;
+      }
+
+      // Check if minimum order quantity is satisfied
+      if (product.category === 'produce' && product.minimumOrderQuantity && quantity < product.minimumOrderQuantity) {
+        Alert.alert('Minimum Order Quantity', `This product requires a minimum order of ${product.minimumOrderQuantity} ${product.stockUnit}.`);
         return;
       }
 
@@ -171,6 +204,115 @@ const ProductDetailsScreen = () => {
     } catch (error) {
       console.error('Error adding to cart:', error);
       Alert.alert('Error', error instanceof Error ? error.message : 'Failed to add item to cart');
+    }
+  };
+
+  // Handle custom quantity input
+  const handleCustomQuantitySubmit = () => {
+    const parsedQuantity = parseInt(customQuantity);
+    if (!isNaN(parsedQuantity) && parsedQuantity > 0) {
+      // Ensure quantity doesn't exceed stock
+      const newQuantity = Math.min(parsedQuantity, product?.stock || 1);
+      setQuantity(newQuantity);
+    }
+    setShowQuantityDialog(false);
+    setCustomQuantity('');
+  };
+
+  // Format currency
+  const formatCurrency = (amount: number) => {
+    return `₹${amount.toLocaleString('en-IN')}`;
+  };
+
+  // Handle negotiation
+  const handleNegotiateSubmit = async () => {
+    try {
+      if (!product || !userProfile) {
+        Alert.alert('Error', 'Product information or user profile is missing');
+        return;
+      }
+
+      // Check if negotiation is available for this product
+      if (!product.negotiatedPrice) {
+        Alert.alert('Error', 'Negotiation is not available for this product');
+        setShowNegotiateDialog(false);
+        return;
+      }
+
+      const parsedPrice = parseFloat(negotiatedPrice);
+      if (isNaN(parsedPrice) || parsedPrice <= 0) {
+        Alert.alert('Error', 'Please enter a valid price');
+        return;
+      }
+
+      // Check if minimum quantity requirement is satisfied
+      if (product.category === 'produce' && product.minimumOrderQuantity && quantity < product.minimumOrderQuantity) {
+        Alert.alert('Error', `Minimum order quantity is ${product.minimumOrderQuantity} ${product.stockUnit}`);
+        return;
+      }
+
+      // Calculate total price based on per-unit negotiated price
+      const totalNegotiatedPrice = parsedPrice * quantity;
+
+      // Check if the negotiated price (per unit) matches the farmer's negotiated price (per unit)
+      if (product.negotiatedPrice && parsedPrice >= product.negotiatedPrice) {
+        // Negotiation successful
+        setShowNegotiateDialog(false);
+
+        // Create a modified product with negotiated price
+        const negotiatedProduct = {
+          ...product,
+          price: product.price, // Keep original price for reference
+          discountedPrice: parsedPrice, // Use negotiated price as discounted price
+          isNegotiated: true,
+          negotiatedPricePerUnit: parsedPrice,
+          totalNegotiatedPrice: totalNegotiatedPrice
+        };
+
+        // If this is a prelisted product, redirect to DirectCheckout
+        if (product.isPrelisted) {
+          // Navigate to DirectCheckout with negotiated price information
+          navigation.navigate('DirectCheckout', {
+            productId: product.id,
+            quantity,
+            farmerId: product.sellerId,
+            isNegotiated: true,
+            negotiatedPrice: parsedPrice,
+            totalNegotiatedPrice: totalNegotiatedPrice
+          });
+        } else {
+          // For regular products, add to cart
+          await CartService.addToCart(userProfile.uid, negotiatedProduct, quantity);
+
+          // Show success message
+          Alert.alert(
+            'Negotiation Successful',
+            `Your offer of ${formatCurrency(parsedPrice)} per ${product.stockUnit} was accepted. The item has been added to your cart.`,
+            [
+              {
+                text: 'Continue Shopping',
+                style: 'cancel'
+              },
+              {
+                text: 'View Cart',
+                onPress: () => navigation.navigate('Cart' as never)
+              }
+            ]
+          );
+        }
+      } else {
+        // Negotiation failed
+        Alert.alert(
+          'Negotiation Failed',
+          'Your offer was not accepted. Please try a different price.',
+          [
+            { text: 'OK' }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error in negotiation:', error);
+      Alert.alert('Error', 'Something went wrong with the negotiation. Please try again.');
     }
   };
 
@@ -212,7 +354,8 @@ const ProductDetailsScreen = () => {
       navigation.navigate('DirectCheckout', {
         productId: product.id,
         quantity,
-        farmerId: product.sellerId
+        farmerId: product.sellerId,
+        isPrelisted: product.isPrelisted || false
       });
     } catch (error) {
       console.error('Error in buy now flow:', error);
@@ -323,6 +466,9 @@ const ProductDetailsScreen = () => {
                 {product.averageRating !== undefined && product.averageRating !== null
                   ? product.averageRating.toFixed(1)
                   : '0.0'}
+                {product.ratings && product.ratings.length > 0 && (
+                  <Text style={styles.ratingCount}> ({product.ratings.length})</Text>
+                )}
               </Text>
             </View>
           </View>
@@ -334,7 +480,7 @@ const ProductDetailsScreen = () => {
                 <Text style={styles.originalPrice}> ₹{product.price}</Text>
               )}
             </Text>
-            <Text style={styles.stockInfo}>
+            <Text style={[styles.stockInfo, isOutOfStock && styles.outOfStockText]}>
               {product.stock > 0 ?
                 `In Stock (${formatStockQuantity(product.stock, product.stockUnit)})` :
                 'Out of Stock'}
@@ -391,6 +537,13 @@ const ProductDetailsScreen = () => {
               {/* Additional produce-specific details */}
               {product.category === 'produce' && (
                 <>
+                  {product.minimumOrderQuantity !== undefined && product.minimumOrderQuantity > 0 && (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Minimum Order:</Text>
+                      <Text style={styles.detailValue}>{product.minimumOrderQuantity} {product.stockUnit}</Text>
+                    </View>
+                  )}
+
                   {product.farmDetails?.harvestDate && (
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Harvest Date:</Text>
@@ -481,7 +634,10 @@ const ProductDetailsScreen = () => {
                 )}
 
                 {product.scientificVerification.certificateUrl && (
-                  <TouchableOpacity style={styles.certificateButton}>
+                  <TouchableOpacity
+                    style={styles.certificateButton}
+                    onPress={() => Linking.openURL(product.scientificVerification.certificateUrl || '')}
+                  >
                     <Ionicons name="document-text" size={18} color={colors.primary} />
                     <Text style={styles.certificateButtonText}>View Certificate</Text>
                   </TouchableOpacity>
@@ -591,10 +747,29 @@ const ProductDetailsScreen = () => {
                       )}
 
                       {certification.certificateUrl && (
-                        <TouchableOpacity style={styles.viewCertificateButton}>
-                          <Ionicons name="document-text" size={16} color={colors.primary} />
-                          <Text style={styles.viewCertificateText}>View Certificate</Text>
-                        </TouchableOpacity>
+                        <View>
+                          <TouchableOpacity
+                            style={styles.viewCertificateButton}
+                            onPress={() => Linking.openURL(certification.certificateUrl || '')}
+                          >
+                            <Ionicons name="document-text" size={16} color={colors.primary} />
+                            <Text style={styles.viewCertificateText}>View Certificate</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={styles.certificateImageContainer}
+                            onPress={() => Linking.openURL(certification.certificateUrl || '')}
+                          >
+                            <Image
+                              source={{ uri: certification.certificateUrl }}
+                              style={styles.certificateImage}
+                              resizeMode="contain"
+                            />
+                            <View style={styles.certificateImageOverlay}>
+                              <Text style={styles.certificateImageText}>Tap to view full certificate</Text>
+                            </View>
+                          </TouchableOpacity>
+                        </View>
                       )}
                     </View>
                   </View>
@@ -649,12 +824,6 @@ const ProductDetailsScreen = () => {
                   ))}
                 </View>
 
-                {product.productJourney.qrCodeUrl && (
-                  <TouchableOpacity style={styles.qrCodeButton}>
-                    <Ionicons name="qr-code" size={18} color={colors.primary} />
-                    <Text style={styles.qrCodeButtonText}>View QR Code</Text>
-                  </TouchableOpacity>
-                )}
               </Card>
             </View>
           )}
@@ -687,6 +856,9 @@ const ProductDetailsScreen = () => {
                   <Ionicons name="star" size={14} color={colors.secondary} />
                   <Text style={styles.sellerRatingText}>
                     {(product.sellerRating || 0).toFixed(1)}
+                    {product.sellerTotalRatings > 0 && (
+                      <Text style={styles.sellerRatingCount}> ({product.sellerTotalRatings})</Text>
+                    )}
                   </Text>
                 </View>
               </View>
@@ -853,69 +1025,220 @@ const ProductDetailsScreen = () => {
           </View>
         ) : (
           <>
-            <View style={styles.quantityContainer}>
-              <View style={styles.quantityControls}>
-                <TouchableOpacity
-                  style={styles.quantityButton}
-                  onPress={() => setQuantity(Math.max(1, quantity - 1))}
-                  disabled={quantity <= 1}
-                >
-                  <Ionicons name="remove" size={20} color={quantity <= 1 ? colors.lightGray : colors.textPrimary} />
-                </TouchableOpacity>
-
-                <Text style={styles.quantityText}>{quantity}</Text>
-
-                <TouchableOpacity
-                  style={styles.quantityButton}
-                  onPress={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                  disabled={quantity >= product.stock}
-                >
-                  <Ionicons name="add" size={20} color={quantity >= product.stock ? colors.lightGray : colors.textPrimary} />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.totalPriceContainer}>
-                <Text style={styles.totalPriceLabel}>Total:</Text>
-                <Text style={styles.totalPriceValue}>
-                  ₹{((product.discountedPrice || product.price) * quantity).toFixed(2)}
-                </Text>
-              </View>
-            </View>
-
-            {product.isDirectFromFarmer ? (
-              <View style={styles.actionButtons}>
-                <Button
-                  title="Direct Purchase"
-                  onPress={() => navigation.navigate('DirectCheckout', {
-                    productId: product.id,
-                    quantity,
-                    farmerId: product.sellerId
-                  })}
-                  style={styles.directBuyButton}
-                  leftIcon={<Ionicons name="leaf" size={18} color={colors.white} style={styles.buttonIcon} />}
-                />
+            {isOutOfStock ? (
+              <View style={styles.outOfStockContainer}>
+                <Ionicons name="alert-circle" size={24} color={colors.error} />
+                <Text style={styles.outOfStockMessage}>This product is currently out of stock</Text>
               </View>
             ) : (
-              <View style={styles.actionButtons}>
-                <Button
-                  title="Add to Cart"
-                  variant="outline"
-                  onPress={handleAddToCart}
-                  style={styles.cartButton}
-                  leftIcon={<Ionicons name="cart-outline" size={18} color={colors.primary} style={styles.buttonIcon} />}
-                />
+              <View style={styles.quantityContainer}>
+                <View style={styles.quantityControls}>
+                  <TouchableOpacity
+                    style={styles.quantityButton}
+                    onPress={() => setQuantity(Math.max(1, quantity - 1))}
+                    disabled={quantity <= 1 || isOutOfStock}
+                  >
+                    <Ionicons name="remove" size={20} color={(quantity <= 1 || isOutOfStock) ? colors.lightGray : colors.textPrimary} />
+                  </TouchableOpacity>
 
-                <Button
-                  title="Buy Now"
-                  onPress={handleBuyNow}
-                  style={styles.buyButton}
-                  leftIcon={<Ionicons name="flash-outline" size={18} color={colors.white} style={styles.buttonIcon} />}
-                />
+                  <TouchableOpacity
+                    onPress={() => setShowQuantityDialog(true)}
+                    disabled={isOutOfStock}
+                  >
+                    <Text style={[styles.quantityText, isOutOfStock && styles.disabledText]}>{quantity}</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.quantityButton}
+                    onPress={() => setQuantity(Math.min(product.stock, quantity + 1))}
+                    disabled={quantity >= product.stock || isOutOfStock}
+                  >
+                    <Ionicons name="add" size={20} color={(quantity >= product.stock || isOutOfStock) ? colors.lightGray : colors.textPrimary} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.totalPriceContainer}>
+                  <Text style={styles.totalPriceLabel}>Total:</Text>
+                  <Text style={styles.totalPriceValue}>
+                    ₹{((product.discountedPrice || product.price) * quantity).toFixed(2)}
+                  </Text>
+                </View>
               </View>
             )}
+
+            <View style={styles.actionButtons}>
+              {product.isPrelisted ? (
+                // Prelisted product buttons
+                <>
+                  <Button
+                    title="Negotiate"
+                    onPress={() => setShowNegotiateDialog(true)}
+                    style={[styles.negotiateButton,
+                      (!isMinimumQuantitySatisfied || !product.negotiatedPrice || isOutOfStock) && styles.disabledOutlineButton]}
+                    leftIcon={<Ionicons name="chatbubble-outline" size={18}
+                      color={(!isMinimumQuantitySatisfied || !product.negotiatedPrice || isOutOfStock) ? colors.lightGray : colors.primary}
+                      style={styles.buttonIcon} />}
+                    disabled={!isMinimumQuantitySatisfied || !product.negotiatedPrice || isOutOfStock}
+                  />
+
+                  <Button
+                    title="Direct Checkout"
+                    onPress={handleBuyNow}
+                    style={[styles.buyNowButton, isOutOfStock && styles.disabledButton]}
+                    leftIcon={<Ionicons name="flash-outline" size={18} color={isOutOfStock ? colors.lightGray : colors.white} style={styles.buttonIcon} />}
+                    disabled={isOutOfStock || !isMinimumQuantitySatisfied}
+                  />
+                </>
+              ) : (
+                // Regular product buttons
+                <>
+                  <Button
+                    title="Add to Cart"
+                    variant="outline"
+                    onPress={handleAddToCart}
+                    style={[styles.cartButton, isOutOfStock && styles.disabledOutlineButton]}
+                    leftIcon={<Ionicons name="cart-outline" size={18} color={isOutOfStock ? colors.lightGray : colors.primary} style={styles.buttonIcon} />}
+                    disabled={isOutOfStock}
+                  />
+
+                  <Button
+                    title="Negotiate"
+                    onPress={() => setShowNegotiateDialog(true)}
+                    style={[styles.negotiateButton,
+                      (!isMinimumQuantitySatisfied || !product.negotiatedPrice || isOutOfStock) && styles.disabledOutlineButton]}
+                    leftIcon={<Ionicons name="chatbubble-outline" size={18}
+                      color={(!isMinimumQuantitySatisfied || !product.negotiatedPrice || isOutOfStock) ? colors.lightGray : colors.primary}
+                      style={styles.buttonIcon} />}
+                    disabled={!isMinimumQuantitySatisfied || !product.negotiatedPrice || isOutOfStock}
+                  />
+                </>
+              )}
+
+              {product.category === 'produce' && product.minimumOrderQuantity && !isMinimumQuantitySatisfied && (
+                <View style={styles.warningContainer}>
+                  <Text style={styles.minimumOrderWarning}>
+                    Minimum order: {product.minimumOrderQuantity} {product.stockUnit}
+                  </Text>
+                </View>
+              )}
+            </View>
           </>
         )}
       </View>
+
+      {/* Custom Quantity Dialog */}
+      <Modal
+        visible={showQuantityDialog}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowQuantityDialog(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Enter Custom Quantity</Text>
+
+            <TextInput
+              style={styles.quantityInput}
+              keyboardType="numeric"
+              value={customQuantity}
+              onChangeText={setCustomQuantity}
+              placeholder={`Enter quantity (max ${product?.stock})`}
+              autoFocus
+            />
+
+            {product?.category === 'produce' && product?.minimumOrderQuantity && (
+              <Text style={styles.minimumQuantityText}>
+                Minimum order: {product.minimumOrderQuantity} {product.stockUnit}
+              </Text>
+            )}
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowQuantityDialog(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={handleCustomQuantitySubmit}
+              >
+                <Text style={styles.confirmButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Negotiation Dialog */}
+      <Modal
+        visible={showNegotiateDialog}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowNegotiateDialog(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Negotiate Price</Text>
+
+            <View style={styles.negotiationDetails}>
+              <Text style={styles.negotiationLabel}>Product:</Text>
+              <Text style={styles.negotiationValue}>{product?.name}</Text>
+            </View>
+
+            <View style={styles.negotiationDetails}>
+              <Text style={styles.negotiationLabel}>Quantity:</Text>
+              <Text style={styles.negotiationValue}>{quantity} {product?.stockUnit}</Text>
+            </View>
+
+            <View style={styles.negotiationDetails}>
+              <Text style={styles.negotiationLabel}>Current Price:</Text>
+              <Text style={styles.negotiationValue}>₹{(product?.discountedPrice || product?.price || 0).toFixed(2)} per {product?.stockUnit}</Text>
+            </View>
+
+            <View style={styles.negotiationDetails}>
+              <Text style={styles.negotiationLabel}>Quantity:</Text>
+              <Text style={styles.negotiationValue}>{quantity} {product?.stockUnit}</Text>
+            </View>
+
+            <View style={styles.priceInputContainer}>
+              <Text style={styles.priceInputLabel}>Your Offer (per {product?.stockUnit}):</Text>
+              <View style={styles.priceInputWrapper}>
+                <Text style={styles.currencySymbol}>₹</Text>
+                <TextInput
+                  style={styles.priceInput}
+                  keyboardType="numeric"
+                  value={negotiatedPrice}
+                  onChangeText={setNegotiatedPrice}
+                  placeholder={`Enter price per ${product?.stockUnit}`}
+                  autoFocus
+                />
+              </View>
+            </View>
+
+            <Text style={styles.negotiationHint}>
+              Enter your offer price per {product?.stockUnit}. If accepted, total will be ₹{negotiatedPrice ? (parseFloat(negotiatedPrice) * quantity).toFixed(2) : '0.00'} + delivery charges.
+            </Text>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowNegotiateDialog(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={handleNegotiateSubmit}
+              >
+                <Text style={styles.confirmButtonText}>Submit Offer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1050,6 +1373,11 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginLeft: spacing.xs,
   },
+  ratingCount: {
+    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textSecondary,
+  },
   priceContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1071,6 +1399,28 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily.medium,
     color: colors.success,
+  },
+  outOfStockText: {
+    color: colors.error,
+    fontFamily: typography.fontFamily.bold,
+  },
+  disabledText: {
+    color: colors.lightGray,
+  },
+  outOfStockContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.errorLight,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.md,
+  },
+  outOfStockMessage: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.error,
+    marginLeft: spacing.sm,
   },
   description: {
     fontSize: typography.fontSize.md,
@@ -1161,6 +1511,11 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.medium,
     color: colors.textPrimary,
     marginLeft: spacing.xs,
+  },
+  sellerRatingCount: {
+    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textSecondary,
   },
   sellerLocation: {
     fontSize: typography.fontSize.sm,
@@ -1503,6 +1858,32 @@ const styles = StyleSheet.create({
     color: colors.primary,
     marginLeft: spacing.xs,
   },
+  certificateImageContainer: {
+    width: '100%',
+    height: 200,
+    marginTop: spacing.md,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  certificateImage: {
+    width: '100%',
+    height: '100%',
+  },
+  certificateImageOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: spacing.xs,
+  },
+  certificateImageText: {
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.medium,
+    textAlign: 'center',
+  },
 
   // Product Journey styles
   journeyContainer: {
@@ -1833,7 +2214,19 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+  },
+  negotiateButton: {
+    width: '100%',
+    marginBottom: spacing.sm,
+  },
+  negotiationUnavailableText: {
+    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
   },
   cartButton: {
     flex: 1,
@@ -1843,8 +2236,168 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   directBuyButton: {
-    flex: 1,
+    width: '100%',
     backgroundColor: colors.success,
+  },
+  disabledButton: {
+    backgroundColor: colors.lightGray,
+    opacity: 0.7,
+  },
+  disabledOutlineButton: {
+    borderColor: colors.lightGray,
+    opacity: 0.7,
+  },
+  warningContainer: {
+    marginTop: spacing.xs,
+    width: '100%',
+  },
+  minimumOrderWarning: {
+    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.error,
+    textAlign: 'center',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  modalContent: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+    textAlign: 'center',
+  },
+  quantityInput: {
+    borderWidth: 1,
+    borderColor: colors.lightGray,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    fontSize: typography.fontSize.md,
+    marginBottom: spacing.md,
+  },
+  minimumQuantityText: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.error,
+    marginBottom: spacing.md,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalButton: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButton: {
+    backgroundColor: colors.surfaceLight,
+    marginRight: spacing.sm,
+  },
+  confirmButton: {
+    backgroundColor: colors.primary,
+    marginLeft: spacing.sm,
+  },
+  cancelButtonText: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.textPrimary,
+  },
+  confirmButtonText: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.white,
+  },
+  negotiationDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  negotiationLabel: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  negotiationValue: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.textPrimary,
+    flex: 2,
+    textAlign: 'right',
+  },
+  priceInputContainer: {
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  priceInputLabel: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  priceInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surfaceLight,
+  },
+  currencySymbol: {
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.primary,
+    marginRight: spacing.xs,
+  },
+  priceInput: {
+    flex: 1,
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.textPrimary,
+    padding: spacing.md,
+  },
+  calculationResult: {
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  calculationLabel: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  calculationFormula: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  negotiationHint: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    marginBottom: spacing.md,
+    textAlign: 'center',
   },
   buttonIcon: {
     marginRight: spacing.xs,

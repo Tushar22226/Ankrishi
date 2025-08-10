@@ -1,20 +1,31 @@
+import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AuthProvider } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
+import { LanguageProvider } from './context/LanguageContext';
+import { OrderNotificationProvider } from './context/OrderNotificationContext';
+import LocationPermissionProvider from './components/LocationPermissionProvider';
+import AppNavigator from './navigation/AppNavigator';
 
 export default function App() {
+  // We don't need to check Firebase initialization here anymore
+  // because it's handled by the FirebaseInitializer component
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <ThemeProvider>
+          <LanguageProvider>
+            <LocationPermissionProvider>
+              <OrderNotificationProvider>
+                <AppNavigator />
+                <StatusBar style="auto" />
+              </OrderNotificationProvider>
+            </LocationPermissionProvider>
+          </LanguageProvider>
+        </ThemeProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

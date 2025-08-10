@@ -59,6 +59,13 @@ const marketplaceCategories = [
     screen: 'Organic',
     image: 'https://via.placeholder.com/100x100?text=Organic',
   },
+  {
+    id: 'requirements',
+    name: 'Requirements',
+    icon: 'document-text',
+    screen: 'Requirements',
+    image: 'https://via.placeholder.com/100x100?text=Requirements',
+  },
 ];
 
 
@@ -236,7 +243,12 @@ const MarketplaceScreen = () => {
 
           <View style={styles.ratingContainer}>
             <Ionicons name="star" size={14} color={colors.secondary} />
-            <Text style={styles.ratingText}>{item.averageRating.toFixed(1)}</Text>
+            <Text style={styles.ratingText}>
+              {item.averageRating.toFixed(1)}
+              {item.ratings && item.ratings.length > 0 && (
+                <Text style={styles.ratingCount}> ({item.ratings.length})</Text>
+              )}
+            </Text>
           </View>
         </View>
 
@@ -258,13 +270,23 @@ const MarketplaceScreen = () => {
             <TouchableOpacity
               style={styles.iconButton}
               onPress={() => navigation.navigate('UserProducts' as never)}
+              activeOpacity={0.7}
             >
               <Ionicons name="basket-outline" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.iconButton}
-              onPress={() => navigation.navigate('My Farm' as never, { screen: 'Orders' } as never)}
+              onPress={() => {
+                // Navigate to Orders screen based on user role
+                if (userProfile?.role === 'farmer') {
+                  navigation.navigate('My Farm' as never, { screen: 'Orders' } as never);
+                } else {
+                  // For vendors and buyers, use the marketplace Orders screen
+                  navigation.navigate('Orders' as never);
+                }
+              }}
+              activeOpacity={0.7}
             >
               <Ionicons name="document-text-outline" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
@@ -272,6 +294,7 @@ const MarketplaceScreen = () => {
             <TouchableOpacity
               style={styles.iconButton}
               onPress={() => navigation.navigate('Cart' as never)}
+              activeOpacity={0.7}
             >
               <Ionicons name="cart-outline" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
@@ -301,7 +324,15 @@ const MarketplaceScreen = () => {
 
           <TouchableOpacity
             style={styles.iconButton}
-            onPress={() => navigation.navigate('My Farm' as never, { screen: 'Orders' } as never)}
+            onPress={() => {
+              // Navigate to Orders screen based on user role
+              if (userProfile?.role === 'farmer') {
+                navigation.navigate('My Farm' as never, { screen: 'Orders' } as never);
+              } else {
+                // For vendors and buyers, use the marketplace Orders screen
+                navigation.navigate('Orders' as never);
+              }
+            }}
           >
             <Ionicons name="document-text-outline" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
@@ -509,13 +540,17 @@ const MarketplaceScreen = () => {
           </View>
         )}
 
-        {/* Sell Button */}
-        {userProfile?.role === 'farmer' || userProfile?.role === 'vendor' ? (
+        {/* Sell/Add Button */}
+        {userProfile?.role === 'farmer' || userProfile?.role === 'vendor' || userProfile?.role === 'buyer' ? (
           <TouchableOpacity
             style={styles.sellButton}
             onPress={() => {
-              // Navigate to AddProduct screen
-              navigation.navigate('AddProduct' as never);
+              // Navigate to AddProduct screen for farmers, AddRequirement for vendors/buyers
+              if (userProfile?.role === 'farmer') {
+                navigation.navigate('AddProduct' as never);
+              } else if (userProfile?.role === 'vendor' || userProfile?.role === 'buyer') {
+                navigation.navigate('AddRequirement' as never);
+              }
             }}
           >
             <Ionicons name="add" size={24} color={colors.white} />
@@ -564,10 +599,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   iconButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 8,
+    backgroundColor: colors.surfaceLight,
+    marginLeft: spacing.xs,
   },
   scrollContainer: {
     flex: 1,
@@ -882,6 +920,11 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.medium,
     color: colors.textSecondary,
     marginLeft: spacing.xs,
+  },
+  ratingCount: {
+    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textSecondary,
   },
   sellerName: {
     fontSize: typography.fontSize.sm,

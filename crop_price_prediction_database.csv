@@ -1,0 +1,45 @@
+crop_id,crop_name,category,base_price_inr_per_kg,optimal_temp_min,optimal_temp_max,water_req_min_mm_week,water_req_max_mm_week,growing_season,soil_moisture_min,soil_moisture_max,profit_potential,market_demand,disease_risk_humidity,disease_risk_temperature,disease_risk_rainfall,storage_life_days,volatility,supply_demand_factor,weather_sensitivity_temp,weather_sensitivity_rainfall,weather_sensitivity_humidity,substitutes,jan_seasonal_factor,feb_seasonal_factor,mar_seasonal_factor,apr_seasonal_factor,may_seasonal_factor,jun_seasonal_factor,jul_seasonal_factor,aug_seasonal_factor,sep_seasonal_factor,oct_seasonal_factor,nov_seasonal_factor,dec_seasonal_factor
+rice,Rice,Cereal,40,20,35,30,50,"June,July,August,September",70,90,7,9,0.7,0.5,0.3,365,0.3,0.7,-0.2,0.3,0.1,wheat,1.05,1.1,1.15,1.2,1.15,1.0,0.9,0.85,0.9,0.95,1.0,1.05
+wheat,Wheat,Cereal,30,15,24,15,25,"November,December,January,February",50,70,6,8,0.6,0.4,0.7,300,0.25,0.6,0.3,-0.2,-0.1,rice,0.9,0.85,0.8,0.85,0.9,1.0,1.1,1.15,1.2,1.15,1.05,0.95
+maize,Maize (Corn),Cereal,25,18,32,20,30,"June,July,August,September",50,80,7,8,0.5,0.3,0.6,270,0.3,0.6,-0.1,0.4,0.1,wheat,1.1,1.15,1.2,1.15,1.1,1.0,0.9,0.85,0.9,0.95,1.0,1.05
+bajra,Bajra (Pearl Millet),Cereal,22,25,35,10,20,"June,July,August",40,60,5,6,0.4,0.3,0.5,240,0.3,0.5,0.2,-0.3,-0.1,jowar,1.1,1.15,1.2,1.15,1.1,1.0,0.9,0.85,0.9,0.95,1.0,1.05
+jowar,Jowar (Sorghum),Cereal,24,25,35,10,20,"June,July,August",40,60,5,6,0.4,0.3,0.5,240,0.3,0.5,0.2,-0.3,-0.1,bajra,1.05,1.1,1.15,1.1,1.05,1.0,0.95,0.9,0.95,1.0,1.05,1.1
+moong,Moong Dal (Green Gram),Pulse,90,20,30,15,25,"March,April,September,October",50,70,8,8,0.5,0.4,0.4,365,0.4,0.7,0.1,0.2,-0.1,"masoor,toor",1.05,1.1,1.0,0.95,1.0,1.05,1.1,1.15,1.1,1.05,1.0,1.05
+masoor,Masoor Dal (Red Lentil),Pulse,85,15,25,15,25,"November,December,January,February",50,70,7,7,0.5,0.4,0.4,365,0.4,0.7,0.1,0.2,-0.1,"moong,toor",0.95,1.0,1.05,1.1,1.15,1.1,1.05,1.0,0.95,0.9,0.95,1.0
+chana,Chana (Chickpea),Pulse,70,15,25,15,25,"November,December,January,February",50,70,7,7,0.5,0.4,0.4,365,0.35,0.6,0.2,0.1,-0.2,,0.9,0.85,0.9,0.95,1.0,1.05,1.1,1.15,1.1,1.05,1.0,0.95
+toor,Toor Dal (Pigeon Pea),Pulse,95,20,30,20,30,"June,July,August,September",50,70,8,8,0.6,0.4,0.5,365,0.45,0.8,0.1,0.3,-0.1,"moong,masoor",1.0,1.05,1.1,1.15,1.1,1.05,1.0,0.95,0.9,0.95,1.0,1.05
+urad,Urad Dal (Black Gram),Pulse,100,20,30,15,25,"March,April,September,October",50,70,8,7,0.5,0.4,0.4,365,0.4,0.7,0.1,0.2,-0.1,moong,1.05,1.1,1.15,1.1,1.05,1.0,0.95,0.9,0.95,1.0,1.05,1.1
+potato,Potato,Vegetable,20,15,25,20,30,"November,December,January,February",60,80,6,8,0.6,0.5,0.5,90,0.5,0.8,0.4,0.2,-0.3,,0.8,0.9,1.0,1.1,1.2,1.3,1.2,1.1,1.0,0.9,0.8,0.7
+tomato,Tomato,Vegetable,35,20,30,25,35,"November,December,January,February,March",60,80,8,9,0.7,0.5,0.6,14,0.7,0.9,-0.3,0.4,-0.2,,1.2,1.1,1.0,0.9,0.8,0.7,0.8,0.9,1.0,1.1,1.2,1.3
+onion,Onion,Vegetable,25,15,25,15,25,"November,December,January,February",50,70,7,8,0.6,0.4,0.5,120,0.6,0.8,0.2,-0.1,-0.3,,0.9,0.85,0.9,0.95,1.0,1.1,1.2,1.3,1.2,1.1,1.0,0.95
+cauliflower,Cauliflower,Vegetable,30,15,25,20,30,"November,December,January,February",60,80,6,7,0.6,0.5,0.5,10,0.5,0.7,0.3,0.2,-0.2,,0.8,0.9,1.0,1.1,1.2,1.3,1.2,1.1,1.0,0.9,0.8,0.7
+brinjal,Brinjal (Eggplant),Vegetable,25,20,30,20,30,"February,March,July,August",60,80,7,7,0.7,0.5,0.6,7,0.5,0.7,-0.1,0.3,-0.1,,1.0,0.9,0.8,0.9,1.0,1.1,1.2,1.1,1.0,0.9,1.0,1.1
+soybean,Soybean,Cash Crop,45,20,30,20,35,"June,July,August,September",50,70,7,8,0.6,0.5,0.4,240,0.4,0.6,-0.1,0.3,0.1,,1.1,1.15,1.2,1.15,1.1,1.05,1.0,0.95,0.9,0.95,1.0,1.05
+cotton,Cotton,Cash Crop,60,20,35,15,25,"April,May,June,July",40,70,8,7,0.7,0.3,0.6,365,0.4,0.7,0.2,-0.1,-0.2,,1.0,1.05,1.1,1.15,1.1,1.05,1.0,0.95,0.9,0.95,1.0,1.05
+sugarcane,Sugarcane,Cash Crop,3,20,35,30,50,"March,April,May,June",60,85,8,7,0.5,0.4,0.3,30,0.3,0.6,0.1,0.2,0.1,,0.95,1.0,1.05,1.1,1.15,1.1,1.05,1.0,0.95,0.9,0.95,1.0
+groundnut,Groundnut (Peanut),Oilseed,50,25,35,20,30,"June,July,August",50,70,7,7,0.6,0.4,0.5,180,0.4,0.6,0.1,0.2,-0.1,,1.0,1.05,1.1,1.15,1.1,1.05,1.0,0.95,0.9,0.95,1.0,1.05
+mustard,Mustard,Oilseed,55,15,25,15,25,"November,December,January,February",50,70,6,6,0.5,0.4,0.6,240,0.35,0.6,0.2,-0.1,-0.1,,0.9,0.85,0.9,0.95,1.0,1.05,1.1,1.15,1.1,1.05,1.0,0.95
+mango,Mango,Fruit,80,24,35,20,35,"February,March,April,May",50,70,9,8,0.7,0.4,0.6,7,0.6,0.8,-0.2,0.3,-0.1,,0.8,0.9,1.0,1.2,1.4,1.3,1.1,0.9,0.8,0.7,0.8,0.9
+banana,Banana,Fruit,40,20,35,25,40,"All Year",60,80,8,8,0.6,0.5,0.7,3,0.5,0.8,-0.1,0.2,0.1,,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+sesame,Sesame,Oilseed,120,25,35,15,25,"June,July,August",40,60,7,6,0.5,0.4,0.4,365,0.4,0.6,0.2,-0.2,-0.1,,1.0,1.05,1.1,1.15,1.1,1.05,1.0,0.95,0.9,0.95,1.0,1.05
+sunflower,Sunflower,Oilseed,45,20,30,20,30,"March,April,May,June",50,70,6,7,0.5,0.4,0.5,240,0.35,0.6,0.1,0.1,-0.1,,1.0,1.05,1.1,1.15,1.1,1.05,1.0,0.95,0.9,0.95,1.0,1.05
+safflower,Safflower,Oilseed,65,15,25,15,25,"November,December,January,February",40,60,6,6,0.4,0.3,0.5,300,0.4,0.6,0.2,-0.1,-0.1,,0.9,0.85,0.9,0.95,1.0,1.05,1.1,1.15,1.1,1.05,1.0,0.95
+turmeric,Turmeric,Spice,150,20,30,25,35,"June,July,August",60,80,8,7,0.6,0.5,0.5,365,0.5,0.7,-0.1,0.3,0.1,,1.0,1.05,1.1,1.15,1.2,1.15,1.1,1.05,1.0,0.95,1.0,1.05
+coriander,Coriander,Spice,200,15,25,15,25,"November,December,January,February",50,70,7,7,0.5,0.4,0.4,180,0.6,0.7,0.1,0.1,-0.1,,0.9,0.85,0.9,0.95,1.0,1.05,1.1,1.15,1.2,1.15,1.1,1.0
+cumin,Cumin,Spice,400,20,30,10,20,"November,December,January,February",40,60,8,8,0.4,0.3,0.4,365,0.7,0.8,0.2,-0.2,-0.1,,0.8,0.85,0.9,0.95,1.0,1.05,1.1,1.2,1.3,1.25,1.15,1.0
+fenugreek,Fenugreek,Spice,80,15,25,15,25,"November,December,January,February",50,70,6,6,0.5,0.4,0.4,240,0.5,0.6,0.1,0.1,-0.1,,0.9,0.85,0.9,0.95,1.0,1.05,1.1,1.15,1.1,1.05,1.0,0.95
+ginger,Ginger,Spice,120,20,30,30,40,"April,May,June",70,85,7,7,0.7,0.5,0.6,120,0.6,0.8,-0.1,0.3,0.1,,1.0,1.05,1.1,1.15,1.2,1.15,1.1,1.05,1.0,0.95,1.0,1.05
+garlic,Garlic,Spice,100,15,25,15,25,"November,December,January,February",50,70,7,8,0.6,0.4,0.5,180,0.7,0.8,0.1,-0.1,-0.2,,0.8,0.85,0.9,0.95,1.0,1.1,1.2,1.3,1.25,1.15,1.05,0.95
+cabbage,Cabbage,Vegetable,20,15,25,20,30,"November,December,January,February",60,80,5,7,0.6,0.5,0.5,30,0.5,0.7,0.2,0.2,-0.2,,0.8,0.9,1.0,1.1,1.2,1.3,1.2,1.1,1.0,0.9,0.8,0.7
+carrot,Carrot,Vegetable,30,15,25,20,30,"November,December,January,February",60,80,6,7,0.5,0.4,0.5,60,0.4,0.7,0.2,0.1,-0.1,,0.8,0.9,1.0,1.1,1.2,1.3,1.2,1.1,1.0,0.9,0.8,0.7
+radish,Radish,Vegetable,15,15,25,20,30,"November,December,January,February",60,80,5,6,0.5,0.4,0.5,15,0.6,0.7,0.2,0.1,-0.1,,0.8,0.9,1.0,1.1,1.2,1.3,1.2,1.1,1.0,0.9,0.8,0.7
+spinach,Spinach,Vegetable,25,15,25,20,30,"November,December,January,February",60,80,6,7,0.6,0.4,0.5,7,0.7,0.8,0.1,0.2,-0.1,,0.8,0.9,1.0,1.1,1.2,1.3,1.2,1.1,1.0,0.9,0.8,0.7
+okra,Okra (Bhindi),Vegetable,30,25,35,20,30,"June,July,August",60,80,7,7,0.6,0.5,0.5,5,0.6,0.8,-0.1,0.3,-0.1,,1.1,1.0,0.9,0.8,0.9,1.0,1.1,1.2,1.1,1.0,1.1,1.2
+bitter_gourd,Bitter Gourd,Vegetable,40,25,35,25,35,"June,July,August",60,80,6,6,0.7,0.5,0.6,7,0.6,0.7,-0.1,0.3,-0.1,,1.1,1.0,0.9,0.8,0.9,1.0,1.1,1.2,1.1,1.0,1.1,1.2
+bottle_gourd,Bottle Gourd,Vegetable,20,25,35,25,35,"June,July,August",60,80,5,6,0.6,0.5,0.5,10,0.5,0.7,-0.1,0.3,-0.1,,1.1,1.0,0.9,0.8,0.9,1.0,1.1,1.2,1.1,1.0,1.1,1.2
+ridge_gourd,Ridge Gourd,Vegetable,25,25,35,25,35,"June,July,August",60,80,6,6,0.6,0.5,0.5,7,0.6,0.7,-0.1,0.3,-0.1,,1.1,1.0,0.9,0.8,0.9,1.0,1.1,1.2,1.1,1.0,1.1,1.2
+green_chili,Green Chili,Spice,60,20,30,20,30,"All Year",60,80,8,8,0.7,0.5,0.6,10,0.8,0.9,-0.2,0.3,-0.1,,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+papaya,Papaya,Fruit,25,25,35,25,35,"All Year",60,80,7,7,0.6,0.5,0.6,7,0.5,0.7,-0.1,0.2,0.1,,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+guava,Guava,Fruit,35,20,35,20,30,"All Year",50,70,7,7,0.6,0.4,0.5,5,0.5,0.7,-0.1,0.2,0.1,,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+pomegranate,Pomegranate,Fruit,150,20,35,15,25,"February,March,April,May",50,70,9,8,0.5,0.4,0.4,30,0.6,0.8,0.1,-0.1,-0.1,,0.8,0.9,1.0,1.2,1.4,1.3,1.1,0.9,0.8,0.7,0.8,0.9
+grapes,Grapes,Fruit,80,20,30,20,30,"February,March,April,May",50,70,8,8,0.6,0.4,0.5,15,0.6,0.8,-0.1,0.1,-0.1,,0.8,0.9,1.0,1.2,1.4,1.3,1.1,0.9,0.8,0.7,0.8,0.9

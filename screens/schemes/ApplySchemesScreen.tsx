@@ -18,6 +18,7 @@ import Button from '../../components/Button';
 import Input from '../../components/Input';
 import { getPlatformTopSpacing } from '../../utils/platformUtils';
 import LoadingQuote from '../../components/LoadingQuote';
+import SchemeService, { GovernmentScheme } from '../../services/SchemeService';
 
 // Mock scheme data (same as in ViewSchemesScreen)
 const mockSchemes = [
@@ -71,10 +72,10 @@ const ApplySchemesScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { userProfile } = useAuth();
-  
+
   // Get scheme ID from route params
   const { schemeId } = route.params as { schemeId: string };
-  
+
   // State
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -83,12 +84,12 @@ const ApplySchemesScreen = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [documentsChecklist, setDocumentsChecklist] = useState<Record<string, boolean>>({});
   const [termsAccepted, setTermsAccepted] = useState(false);
-  
+
   // Load scheme on component mount
   useEffect(() => {
     loadScheme();
   }, [schemeId]);
-  
+
   // Initialize form data and documents checklist when scheme is loaded
   useEffect(() => {
     if (scheme) {
@@ -97,16 +98,16 @@ const ApplySchemesScreen = () => {
       scheme.formFields.forEach((field: any) => {
         initialFormData[field.id] = '';
       });
-      
+
       // Pre-fill with user profile data if available
       if (userProfile) {
         if (userProfile.displayName) initialFormData.name = userProfile.displayName;
         if (userProfile.phoneNumber) initialFormData.mobile = userProfile.phoneNumber;
         // Add more pre-filled fields as needed
       }
-      
+
       setFormData(initialFormData);
-      
+
       // Initialize documents checklist
       const initialChecklist: Record<string, boolean> = {};
       scheme.documents.forEach((doc: string) => {
@@ -115,31 +116,32 @@ const ApplySchemesScreen = () => {
       setDocumentsChecklist(initialChecklist);
     }
   }, [scheme, userProfile]);
-  
+
   // Load scheme
   const loadScheme = async () => {
     try {
       setLoading(true);
-      
-      // In a real app, we would fetch the scheme from a service
-      // For now, let's use mock data
-      setTimeout(() => {
-        const foundScheme = mockSchemes.find(s => s.id === schemeId);
-        if (foundScheme) {
-          setScheme(foundScheme);
-        } else {
-          Alert.alert('Error', 'Scheme not found');
-          navigation.goBack();
-        }
-        setLoading(false);
-      }, 1000);
+
+      // Fetch scheme from SchemeService
+      console.log('Fetching scheme with ID:', schemeId);
+      const foundScheme = await SchemeService.getSchemeById(schemeId);
+
+      if (foundScheme) {
+        console.log('Found scheme:', foundScheme.title);
+        setScheme(foundScheme);
+      } else {
+        console.log('Scheme not found in database');
+        Alert.alert('Error', 'Scheme not found');
+        navigation.goBack();
+      }
+      setLoading(false);
     } catch (error) {
       console.error('Error loading scheme:', error);
       setLoading(false);
       Alert.alert('Error', 'Failed to load scheme details');
     }
   };
-  
+
   // Format date
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', {
@@ -148,14 +150,14 @@ const ApplySchemesScreen = () => {
       year: 'numeric',
     });
   };
-  
+
   // Handle form input change
   const handleInputChange = (id: string, value: string) => {
     setFormData(prev => ({
       ...prev,
       [id]: value,
     }));
-    
+
     // Clear error for this field
     if (errors[id]) {
       setErrors(prev => ({
@@ -164,7 +166,7 @@ const ApplySchemesScreen = () => {
       }));
     }
   };
-  
+
   // Handle document checkbox toggle
   const handleDocumentToggle = (document: string) => {
     setDocumentsChecklist(prev => ({
@@ -172,12 +174,12 @@ const ApplySchemesScreen = () => {
       [document]: !prev[document],
     }));
   };
-  
+
   // Validate form
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
     let isValid = true;
-    
+
     // Validate form fields
     scheme.formFields.forEach((field: any) => {
       if (field.required && !formData[field.id]) {
@@ -185,34 +187,34 @@ const ApplySchemesScreen = () => {
         isValid = false;
       }
     });
-    
+
     // Validate documents checklist
     const allDocumentsChecked = Object.values(documentsChecklist).every(checked => checked);
     if (!allDocumentsChecked) {
       newErrors.documents = 'Please confirm you have all required documents';
       isValid = false;
     }
-    
+
     // Validate terms acceptance
     if (!termsAccepted) {
       newErrors.terms = 'You must accept the terms and conditions';
       isValid = false;
     }
-    
+
     setErrors(newErrors);
     return isValid;
   };
-  
+
   // Handle form submission
   const handleSubmit = async () => {
     if (!validateForm()) {
       Alert.alert('Validation Error', 'Please fill all required fields and check all documents');
       return;
     }
-    
+
     try {
       setSubmitting(true);
-      
+
       // In a real app, we would submit the form to a service
       // For now, let's simulate a submission
       setTimeout(() => {
@@ -234,7 +236,7 @@ const ApplySchemesScreen = () => {
       Alert.alert('Error', 'Failed to submit application');
     }
   };
-  
+
   // Loading state
   if (loading) {
     return (
@@ -244,7 +246,7 @@ const ApplySchemesScreen = () => {
       </View>
     );
   }
-  
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -254,12 +256,12 @@ const ApplySchemesScreen = () => {
         >
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        
+
         <Text style={styles.title}>Apply for Scheme</Text>
-        
+
         <View style={styles.placeholder} />
       </View>
-      
+
       <ScrollView
         style={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
@@ -268,7 +270,7 @@ const ApplySchemesScreen = () => {
         <Card style={styles.schemeInfoCard}>
           <Text style={styles.schemeTitle}>{scheme.title}</Text>
           <Text style={styles.schemeMinistry}>{scheme.ministry}</Text>
-          
+
           {scheme.lastDate && (
             <View style={styles.lastDateContainer}>
               <Text style={styles.lastDateLabel}>Last Date for Application:</Text>
@@ -278,11 +280,11 @@ const ApplySchemesScreen = () => {
             </View>
           )}
         </Card>
-        
+
         {/* Application Form */}
         <Card style={styles.formCard}>
           <Text style={styles.sectionTitle}>Application Form</Text>
-          
+
           {scheme.formFields.map((field: any) => (
             <View key={field.id} style={styles.formField}>
               <Input
@@ -297,14 +299,14 @@ const ApplySchemesScreen = () => {
             </View>
           ))}
         </Card>
-        
+
         {/* Required Documents */}
         <Card style={styles.documentsCard}>
           <Text style={styles.sectionTitle}>Required Documents</Text>
           <Text style={styles.documentsDescription}>
             Please confirm that you have the following documents ready for submission:
           </Text>
-          
+
           {scheme.documents.map((document: string, index: number) => (
             <View key={index} style={styles.documentItem}>
               <Text style={styles.documentName}>{document}</Text>
@@ -316,12 +318,12 @@ const ApplySchemesScreen = () => {
               />
             </View>
           ))}
-          
+
           {errors.documents && (
             <Text style={styles.errorText}>{errors.documents}</Text>
           )}
         </Card>
-        
+
         {/* Terms and Conditions */}
         <Card style={styles.termsCard}>
           <View style={styles.termsHeader}>
@@ -332,11 +334,11 @@ const ApplySchemesScreen = () => {
               <Text style={styles.viewFullTermsText}>View Full Terms</Text>
             </TouchableOpacity>
           </View>
-          
+
           <Text style={styles.termsText}>
             By submitting this application, I hereby declare that all the information provided is true and correct to the best of my knowledge. I understand that any false statement may result in the rejection of my application or cancellation of benefits.
           </Text>
-          
+
           <View style={styles.termsCheckbox}>
             <Switch
               value={termsAccepted}
@@ -348,12 +350,12 @@ const ApplySchemesScreen = () => {
               I accept the terms and conditions
             </Text>
           </View>
-          
+
           {errors.terms && (
             <Text style={styles.errorText}>{errors.terms}</Text>
           )}
         </Card>
-        
+
         {/* Submit Button */}
         <View style={styles.submitButtonContainer}>
           <Button
@@ -363,7 +365,7 @@ const ApplySchemesScreen = () => {
             fullWidth
           />
         </View>
-        
+
         {/* Bottom spacing */}
         <View style={styles.bottomSpacing} />
       </ScrollView>

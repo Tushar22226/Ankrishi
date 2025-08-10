@@ -26,7 +26,7 @@ const GroupCheckoutScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { userProfile } = useAuth();
-  
+
   // State variables
   const [loading, setLoading] = useState(true);
   const [processingOrder, setProcessingOrder] = useState(false);
@@ -50,19 +50,19 @@ const GroupCheckoutScreen = () => {
   const loadCheckoutData = async () => {
     try {
       setLoading(true);
-      
+
       // Get wallet balance
       const balance = await WalletService.getBalance(userProfile!.uid);
       setWalletBalance(balance);
-      
+
       // Get grouped cart items
       const items = await CartService.getGroupedCartItems(userProfile!.uid);
       setGroupedItems(items);
-      
+
       // Initialize delivery options and shipping addresses
       const deliveryOpts: Record<string, 'delivery' | 'self_pickup'> = {};
       const addresses: Record<string, any> = {};
-      
+
       // Set default delivery option for each seller
       Object.keys(items).forEach(sellerId => {
         deliveryOpts[sellerId] = 'delivery';
@@ -75,10 +75,10 @@ const GroupCheckoutScreen = () => {
           pincode: '',
         };
       });
-      
+
       setDeliveryOptions(deliveryOpts);
       setShippingAddresses(addresses);
-      
+
       setLoading(false);
     } catch (error) {
       console.error('Error loading checkout data:', error);
@@ -90,7 +90,7 @@ const GroupCheckoutScreen = () => {
   // Calculate total price for a seller's items
   const calculateSellerTotal = (sellerId: string) => {
     if (!groupedItems[sellerId]) return 0;
-    
+
     return Object.values(groupedItems[sellerId]).flat().reduce((total, item) => {
       const itemPrice = item.discountedPrice || item.price;
       return total + (itemPrice * item.quantity);
@@ -100,7 +100,7 @@ const GroupCheckoutScreen = () => {
   // Calculate delivery fee for a seller
   const calculateDeliveryFee = (sellerId: string) => {
     if (deliveryOptions[sellerId] === 'self_pickup') return 0;
-    
+
     const totalPrice = calculateSellerTotal(sellerId);
     return totalPrice > 1000 ? 0 : 50; // Free delivery for orders over ₹1000
   };
@@ -153,18 +153,18 @@ const GroupCheckoutScreen = () => {
 
       // Process each seller's order separately
       const orderIds: string[] = [];
-      
+
       for (const sellerId of Object.keys(groupedItems)) {
         // Create order items
         const orderItems: OrderItem[] = [];
-        
+
         // Process each category's items
         for (const category of Object.keys(groupedItems[sellerId]) as ProductCategory[]) {
           const items = groupedItems[sellerId][category];
-          
+
           // For produce from farmers, we'll handle differently
           const isDirectFromFarmer = category === 'produce' && items.some(item => item.isDirectFromFarmer);
-          
+
           // Add items to order
           for (const item of items) {
             const orderItem: OrderItem = {
@@ -175,54 +175,77 @@ const GroupCheckoutScreen = () => {
               price: item.discountedPrice || item.price,
               totalPrice: (item.discountedPrice || item.price) * item.quantity,
             };
-            
+
             orderItems.push(orderItem);
           }
         }
-        
+
         // Calculate amounts
         const totalPrice = calculateSellerTotal(sellerId);
         const deliveryFee = calculateDeliveryFee(sellerId);
         const totalAmount = calculateSellerTotalAmount(sellerId);
-        
-        // 1. Deduct money from buyer's wallet
-        await WalletService.withdrawBalance(
+
+        // 1. Hold money in buyer's wallet (don't transfer yet)
+        const holdTransaction = await WalletService.holdBalance(
           userProfile!.uid,
           totalAmount,
-          `Payment for order from ${groupedItems[sellerId].items[0]?.seller || 'seller'}`
+          `Payment for order from ${groupedItems[sellerId].items[0]?.seller || 'seller'} - Pending confirmation`,
+          'pending', // Will be updated after order creation
+          sellerId
         );
-        
-        // 2. Add money to seller's wallet (only the product price, not delivery fee)
-        await WalletService.addBalance(
-          sellerId,
-          totalPrice,
-          `Payment received for order from ${userProfile?.displayName || 'buyer'}`
-        );
-        
-        // 3. Store delivery fee if applicable
+
+        // 2. Store delivery fee information if applicable
+        let deliveryFeeData = null;
         if (deliveryFee > 0) {
           const deliveryFeesRef = database().ref('delivery_fees');
-          await deliveryFeesRef.push({
+          deliveryFeeData = {
             orderId: 'pending', // Will be updated after order creation
             buyerId: userProfile!.uid,
             sellerId: sellerId,
             amount: deliveryFee,
             timestamp: Date.now(),
-          });
+            holdTransactionId: holdTransaction.id
+          };
+          await deliveryFeesRef.push(deliveryFeeData);
         }
-        
-        // Create order
+
+        // Create order with payment hold information
         const orderId = await MarketplaceService.createDirectOrder(
           userProfile!.uid,
           sellerId,
           orderItems,
           shippingAddresses[sellerId],
           'wallet' as PaymentMethod,
-          deliveryOptions[sellerId]
+          deliveryOptions[sellerId],
+          undefined, // deliveryAgentId
+          holdTransaction.id // Store the hold transaction ID with the order
         );
-        
+
+        // Update the hold transaction with the order ID
+        await database().ref(`wallets/${userProfile!.uid}/transactions/${holdTransaction.id}`).update({
+          relatedOrderId: orderId
+        });
+
+        // Update delivery fee record with the order ID if applicable
+        if (deliveryFee > 0 && deliveryFeeData) {
+          // Find the delivery fee record we just created
+          const deliveryFeesRef = database().ref('delivery_fees');
+          const snapshot = await deliveryFeesRef.orderByChild('timestamp')
+            .equalTo(deliveryFeeData.timestamp)
+            .once('value');
+
+          if (snapshot.exists()) {
+            // Update the first matching record
+            const deliveryFeeRecords = snapshot.val();
+            const deliveryFeeId = Object.keys(deliveryFeeRecords)[0];
+            await deliveryFeesRef.child(deliveryFeeId).update({
+              orderId: orderId
+            });
+          }
+        }
+
         orderIds.push(orderId);
-        
+
         // Create food_delivery entry if delivery option is selected
         if (deliveryOptions[sellerId] === 'delivery') {
           await database().ref(`food_delivery/${orderId}`).set({
@@ -241,10 +264,10 @@ const GroupCheckoutScreen = () => {
           });
         }
       }
-      
+
       // Clear cart after successful order
       await CartService.clearCart(userProfile!.uid);
-      
+
       // Navigate to order success screen
       navigation.navigate('OrderSuccess' as never, { orderIds } as never);
     } catch (error) {
@@ -302,14 +325,14 @@ const GroupCheckoutScreen = () => {
                     {groupedItems[sellerId].items[0]?.seller || 'Seller'}
                   </Text>
                 </View>
-                
+
                 {/* Order Items */}
                 {Object.keys(groupedItems[sellerId]).map((category) => (
                   <View key={category} style={styles.categorySection}>
                     <Text style={styles.categoryTitle}>
                       {category.charAt(0).toUpperCase() + category.slice(1)}
                     </Text>
-                    
+
                     {groupedItems[sellerId][category as ProductCategory].map((item) => (
                       <View key={item.id} style={styles.itemRow}>
                         <Text style={styles.itemName}>{item.name}</Text>
@@ -321,11 +344,11 @@ const GroupCheckoutScreen = () => {
                     ))}
                   </View>
                 ))}
-                
+
                 {/* Delivery Options */}
                 <View style={styles.deliveryOptionsContainer}>
                   <Text style={styles.sectionTitle}>Delivery Options</Text>
-                  
+
                   <View style={styles.deliveryOptions}>
                     <TouchableOpacity
                       style={[
@@ -350,7 +373,7 @@ const GroupCheckoutScreen = () => {
                         <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
                       )}
                     </TouchableOpacity>
-                    
+
                     <TouchableOpacity
                       style={[
                         styles.deliveryOption,
@@ -376,7 +399,7 @@ const GroupCheckoutScreen = () => {
                     </TouchableOpacity>
                   </View>
                 </View>
-                
+
                 {/* Order Summary */}
                 <View style={styles.summaryContainer}>
                   <View style={styles.summaryRow}>
@@ -385,14 +408,14 @@ const GroupCheckoutScreen = () => {
                       {formatCurrency(calculateSellerTotal(sellerId))}
                     </Text>
                   </View>
-                  
+
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Delivery Fee</Text>
                     <Text style={styles.summaryValue}>
                       {formatCurrency(calculateDeliveryFee(sellerId))}
                     </Text>
                   </View>
-                  
+
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabelTotal}>Total</Text>
                     <Text style={styles.summaryValueTotal}>
@@ -402,7 +425,7 @@ const GroupCheckoutScreen = () => {
                 </View>
               </Card>
             ))}
-            
+
             {/* Grand Total */}
             <Card style={styles.grandTotalCard}>
               <View style={styles.grandTotalRow}>
@@ -411,7 +434,7 @@ const GroupCheckoutScreen = () => {
                   {formatCurrency(calculateGrandTotal())}
                 </Text>
               </View>
-              
+
               <View style={styles.walletBalanceRow}>
                 <Text style={styles.walletBalanceLabel}>Wallet Balance</Text>
                 <Text style={styles.walletBalanceValue}>
@@ -419,7 +442,7 @@ const GroupCheckoutScreen = () => {
                 </Text>
               </View>
             </Card>
-            
+
             {/* Place Order Button */}
             <Button
               title="Place Order"

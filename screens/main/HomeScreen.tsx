@@ -37,8 +37,6 @@ interface FeatureCard {
 
 // Feature cards data
 const featureCards: FeatureCard[] = [
-  // Essential Features
-
 
   // New Crisis Support Features
   {
@@ -79,7 +77,7 @@ const featureCards: FeatureCard[] = [
   },
   {
     id: '24',
-    title: 'Scheme Navigator',
+    title: 'Schemes Discovery',
     icon: 'compass',
     screen: 'SchemeNavigator',
     description: 'Find and apply for government schemes',
@@ -115,26 +113,10 @@ const featureCards: FeatureCard[] = [
     color: '#8BC34A',
     role: 'farmer',
   },
-  {
-    id: '29',
-    title: 'Sensor Data',
-    icon: 'analytics',
-    screen: 'SensorData',
-    description: 'Track and analyze farm sensor data',
-    color: '#3F51B5',
-    role: 'farmer',
-  },
+
 
   // Financial Management
-  {
-    id: '9',
-    title: 'Financial Plan',
-    icon: 'calculator',
-    screen: 'FinancialPlanInput',
-    description: 'Create a personalized financial plan',
-    color: '#009688',
-    role: 'farmer',
-  },
+
   {
     id: '10',
     title: 'Add Income',
@@ -162,55 +144,17 @@ const featureCards: FeatureCard[] = [
     color: '#3F51B5',
     role: 'farmer',
   },
-
-  // Document Management
   {
-    id: '13',
-    title: 'Lease Management',
-    icon: 'document-text',
-    screen: 'LeaseManagement',
-    description: 'Manage land leases',
-    color: '#795548',
+    id: '30',
+    title: 'Side Income',
+    icon: 'bicycle',
+    screen: 'SideIncome',
+    description: 'Explore additional income opportunities',
+    color: '#9C27B0',
     role: 'farmer',
   },
-  {
-    id: '14',
-    title: 'Documents',
-    icon: 'folder',
-    screen: 'DocumentManagement',
-    description: 'Store important documents',
-    color: '#607D8B',
-    role: 'all',
-  },
-  {
-    id: '15',
-    title: 'Contracts',
-    icon: 'create',
-    screen: 'ContractManagement',
-    description: 'Manage farming contracts',
-    color: '#9E9E9E',
-    role: 'all',
-  },
-  {
-    id: '25',
-    title: 'Tenders',
-    icon: 'megaphone',
-    screen: 'ContractManagement',
-    description: 'Browse and bid on tenders',
-    color: '#FF9800',
-    role: 'all',
-  },
-  // Add duplicates in Essential category for better visibility
-  // Other Features
-  {
-    id: '16',
-    title: 'Farm Buy/Sell',
-    icon: 'business',
-    screen: 'FarmBuySell',
-    description: 'Buy or sell farmland',
-    color: '#E91E63',
-    role: 'all',
-  }
+
+  // Document Management
 ];
 
 // Feature categories for SwaRail-style UI
@@ -260,7 +204,7 @@ const getCategoryForFeature = (featureId: string): string => {
   if (id >= 1 && id <= 6 || id === 19 || id === 26 || id === 27) return 'essential';
   if (id >= 20 && id <= 24) return 'crisis';
   if (id >= 7 && id <= 8 || id === 28 || id === 29) return 'ai';
-  if (id >= 9 && id <= 12) return 'financial';
+  if (id >= 9 && id <= 12 || id === 30) return 'financial';
   if (id >= 13 && id <= 16 || id === 25) return 'documents';
   return 'essential';
 };
@@ -274,9 +218,11 @@ const HomeScreen = () => {
   const [weatherForecast, setWeatherForecast] = useState<any>(null);
   const [recommendations, setRecommendations] = useState<string[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
-  // No longer need selected category state
   const [showAlert, setShowAlert] = useState(true);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  // Modal state for category options
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<FeatureCategory | null>(null);
 
   // Group feature cards by category and filter by user role
   const featureCardsByCategory = featureCategories.reduce((acc, category) => {
@@ -360,13 +306,33 @@ const HomeScreen = () => {
       }
 
       // Get AI recommendations
-      if (user) {
+      if (user && userProfile?.location) {
+        try {
+          // Get personalized recommendations with location data for more accurate results
+          const recs = await ForecastService.getPersonalizedRecommendations(user.uid, userProfile.location);
+          setRecommendations(recs);
+        } catch (recError) {
+          console.error('Error getting personalized recommendations:', recError);
+          // Fallback to basic recommendations without location
+          const basicRecs = await ForecastService.getPersonalizedRecommendations(user.uid);
+          setRecommendations(basicRecs);
+        }
+      } else if (user) {
+        // Fallback if no location data
         const recs = await ForecastService.getPersonalizedRecommendations(user.uid);
         setRecommendations(recs);
       }
 
       // Get featured products
-      const products = await MarketplaceService.getRecommendedProducts(user?.uid || '');
+      let products = await MarketplaceService.getRecommendedProducts(user?.uid || '');
+
+      // If current user is a farmer, filter to show only fertilizers and equipment
+      if (userProfile?.role === 'farmer') {
+        products = products.filter(product =>
+          product.category === 'fertilizer' || product.category === 'equipment'
+        );
+      }
+
       setFeaturedProducts(products);
 
     } catch (error) {
@@ -388,6 +354,67 @@ const HomeScreen = () => {
     console.log('Navigating to FinancialPlanInput');
     // Direct navigation to the screen
     navigation.navigate('FinancialPlanInput' as never);
+  };
+
+  // Handle category press to show modal
+  const handleCategoryPress = (category: FeatureCategory) => {
+    setSelectedCategory(category);
+    setShowCategoryModal(true);
+  };
+
+  // Handle feature press from modal
+  const handleFeaturePress = (feature: FeatureCard) => {
+    // Close modal first
+    setShowCategoryModal(false);
+    setSelectedCategory(null);
+
+    // Handle navigation to screens in different navigators
+    if (feature.screen === 'MyFarmMain') {
+      navigation.navigate('My Farm' as never);
+    } else if (feature.screen === 'Orders') {
+      // Navigate to Orders screen based on user role
+      if (userProfile?.role === 'farmer') {
+        navigation.navigate('My Farm' as never, { screen: 'Orders' } as never);
+      } else {
+        // For vendors and buyers, use the marketplace Orders screen
+        navigation.navigate('Marketplace' as never, { screen: 'Orders' } as never);
+      }
+    } else if (feature.screen === 'UserProducts') {
+      navigation.navigate('Marketplace' as never, { screen: 'UserProducts' } as never);
+    }
+    // Handle Marketplace screens
+    else if (feature.screen === 'Fertilizer' || feature.screen === 'EquipmentRental' ||
+            feature.screen === 'AddProduct' || feature.screen === 'Produce') {
+      navigation.navigate('Marketplace' as never, { screen: feature.screen } as never);
+    }
+    // Handle Chatbot screens
+    else if (feature.screen === 'ChatbotMain') {
+      navigation.navigate('Chatbot' as never);
+    }
+    // Handle E-Learning screens
+    else if (feature.screen === 'ELearningMain') {
+      navigation.navigate('E-Learning' as never);
+    }
+    // Handle Farm Management screens
+    else if (feature.screen === 'AddIncome' || feature.screen === 'AddExpense' || feature.screen === 'Reports') {
+      console.log('Navigating to screen:', feature.screen);
+      navigation.navigate('My Farm' as never, { screen: feature.screen } as never);
+    }
+    // Special case for Financial Plan Input
+    else if (feature.screen === 'FinancialPlanInput') {
+      console.log('Navigating to FinancialPlanInput from feature card');
+      navigateToFinancialPlanInput();
+    }
+    // Special case for Tenders
+    else if (feature.title === 'Tenders') {
+      console.log('Navigating to Tenders');
+      navigation.navigate('ContractManagement' as never, { initialTab: 'tenders' } as never);
+    }
+    // For screens in the current navigator (Home stack)
+    else {
+      console.log('Navigating to screen:', feature.screen);
+      navigation.navigate(feature.screen as never);
+    }
   };
 
   // Render weather widget
@@ -426,14 +453,14 @@ const HomeScreen = () => {
 
           <View style={styles.weatherDetails}>
             <Text style={styles.temperature}>
-              {weatherForecast.temperature.avg}°C
+              {Math.round(weatherForecast.temperature.avg)}°C
             </Text>
             <Text style={styles.weatherCondition}>
               {weatherForecast.condition.charAt(0).toUpperCase() +
                 weatherForecast.condition.slice(1).replace('_', ' ')}
             </Text>
             <Text style={styles.weatherSubtext}>
-              H: {weatherForecast.temperature.max}° L: {weatherForecast.temperature.min}°
+              H: {Math.round(weatherForecast.temperature.max)}° L: {Math.round(weatherForecast.temperature.min)}°
             </Text>
           </View>
 
@@ -526,7 +553,9 @@ const HomeScreen = () => {
     return (
       <View style={styles.featuredProductsContainer}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Featured Products</Text>
+          <Text style={styles.sectionTitle}>
+            {userProfile?.role === 'farmer' ? 'Equipment & Fertilizers' : 'Featured Products'}
+          </Text>
           <TouchableOpacity onPress={() => navigation.navigate('Marketplace' as never)}>
             <Text style={styles.viewMore}>View All</Text>
           </TouchableOpacity>
@@ -662,91 +691,32 @@ const HomeScreen = () => {
         {/* Weather Widget */}
         {renderWeatherWidget()}
 
-        {/* Feature Categories Cards */}
-        {featureCategories.map((category) => {
-          const categoryFeatures = featureCardsByCategory[category.id] || [];
-          if (categoryFeatures.length === 0) return null;
+        {/* Feature Categories Grid */}
+        <View style={styles.categoriesContainer}>
+          <Text style={styles.categoriesTitle}>Categories</Text>
+          <View style={styles.categoriesGrid}>
+            {featureCategories.map((category) => {
+              const categoryFeatures = featureCardsByCategory[category.id] || [];
+              if (categoryFeatures.length === 0) return null;
 
-          // Using horizontal ScrollView instead of grid
-
-          return (
-            <Card key={category.id} style={styles.categoryCard}>
-              <View style={styles.categoryCardHeader}>
-                <View style={[styles.categoryIconContainer, { backgroundColor: category.color }]}>
-                  <Ionicons name={category.icon as any} size={24} color={colors.white} />
-                </View>
-                <Text style={styles.categoryCardTitle}>{category.title}</Text>
-              </View>
-
-              <View style={styles.categoryFeaturesContainer}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.featuresScrollContent}
+              return (
+                <TouchableOpacity
+                  key={category.id}
+                  style={styles.categoryGridItem}
+                  onPress={() => handleCategoryPress(category)}
+                  activeOpacity={0.7}
                 >
-                  {categoryFeatures.map((feature) => (
-                    <TouchableOpacity
-                      key={feature.id}
-                      style={styles.featureItem}
-                      onPress={() => {
-                      // Handle navigation to screens in different navigators
-                      if (feature.screen === 'MyFarmMain') {
-                        navigation.navigate('My Farm' as never);
-                      } else if (feature.screen === 'Orders') {
-                        navigation.navigate('My Farm' as never, { screen: 'Orders' } as never);
-                      } else if (feature.screen === 'UserProducts') {
-                        navigation.navigate('Marketplace' as never, { screen: 'UserProducts' } as never);
-                      }
-                      // Handle Marketplace screens
-                      else if (feature.screen === 'Fertilizer' || feature.screen === 'EquipmentRental' ||
-                              feature.screen === 'AddProduct' || feature.screen === 'Produce') {
-                        navigation.navigate('Marketplace' as never, { screen: feature.screen } as never);
-                      }
-                      // Handle Chatbot screens
-                      else if (feature.screen === 'ChatbotMain') {
-                        navigation.navigate('Chatbot' as never);
-                      }
-                      // Handle E-Learning screens
-                      else if (feature.screen === 'ELearningMain') {
-                        navigation.navigate('E-Learning' as never);
-                      }
-                      // Handle Farm Management screens
-                      else if (feature.screen === 'AddIncome' || feature.screen === 'AddExpense' || feature.screen === 'Reports') {
-                        console.log('Navigating to screen:', feature.screen);
-                        navigation.navigate('My Farm' as never, { screen: feature.screen } as never);
-                      }
-                      // Special case for Financial Plan Input
-                      else if (feature.screen === 'FinancialPlanInput') {
-                        console.log('Navigating to FinancialPlanInput from feature card');
-                        navigateToFinancialPlanInput();
-                      }
-                      // Special case for Tenders
-                      else if (feature.title === 'Tenders') {
-                        console.log('Navigating to Tenders');
-                        navigation.navigate('ContractManagement' as never, { initialTab: 'tenders' } as never);
-                      }
-                      // For screens in the current navigator (Home stack)
-                      else {
-                        console.log('Navigating to screen:', feature.screen);
-                        navigation.navigate(feature.screen as never);
-                      }
-                    }}
-                  >
-                    <View style={[styles.featureIconContainer, { backgroundColor: feature.color }]}>
-                      <Ionicons name={feature.icon as any} size={24} color={colors.white} />
-                    </View>
-                    <View style={styles.featureTextContainer}>
-                      <Text style={styles.featureTitle} numberOfLines={1}>
-                        {feature.title}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            </Card>
-          );
-        })}
+                  <View style={[styles.categoryGridIconContainer, { backgroundColor: category.color }]}>
+                    <Ionicons name={category.icon as any} size={32} color={colors.white} />
+                  </View>
+                  <Text style={styles.categoryGridTitle} numberOfLines={2}>
+                    {category.title}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
 
         {/* AI Recommendations */}
         {renderRecommendations()}
@@ -754,6 +724,68 @@ const HomeScreen = () => {
         {/* Featured Products */}
         {renderFeaturedProducts()}
       </ScrollView>
+
+      {/* Category Options Modal */}
+      <Modal
+        visible={showCategoryModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          setShowCategoryModal(false);
+          setSelectedCategory(null);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleContainer}>
+                {selectedCategory && (
+                  <View style={[styles.modalCategoryIcon, { backgroundColor: selectedCategory.color }]}>
+                    <Ionicons name={selectedCategory.icon as any} size={24} color={colors.white} />
+                  </View>
+                )}
+                <Text style={styles.modalTitle}>
+                  {selectedCategory?.title || 'Category'} Features
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => {
+                  setShowCategoryModal(false);
+                  setSelectedCategory(null);
+                }}
+              >
+                <Ionicons name="close" size={24} color={colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Features Grid */}
+            <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
+              <View style={styles.modalFeaturesGrid}>
+                {selectedCategory && featureCardsByCategory[selectedCategory.id]?.map((feature) => (
+                  <TouchableOpacity
+                    key={feature.id}
+                    style={styles.modalFeatureItem}
+                    onPress={() => handleFeaturePress(feature)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.modalFeatureIconContainer, { backgroundColor: feature.color }]}>
+                      <Ionicons name={feature.icon as any} size={28} color={colors.white} />
+                    </View>
+                    <Text style={styles.modalFeatureTitle} numberOfLines={2}>
+                      {feature.title}
+                    </Text>
+                    <Text style={styles.modalFeatureDescription} numberOfLines={2}>
+                      {feature.description}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -989,10 +1021,7 @@ const styles = StyleSheet.create({
   categoryCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.md,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
+    paddingVertical: spacing.sm,
   },
   categoryIconContainer: {
     width: 35,
@@ -1002,10 +1031,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: spacing.sm,
   },
+  categoryTitleContainer: {
+    flex: 1,
+    marginLeft: spacing.sm,
+  },
   categoryCardTitle: {
     fontSize: 15,
     fontFamily: typography.fontFamily.bold,
     color: colors.textPrimary,
+  },
+  categorySubtitle: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   categoryFeaturesContainer: {
     marginTop: spacing.xs,
@@ -1013,6 +1052,57 @@ const styles = StyleSheet.create({
   featuresScrollContent: {
     paddingHorizontal: spacing.xxs,
     paddingBottom: spacing.xs,
+  },
+  // Categories Grid styles
+  categoriesContainer: {
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
+  },
+  categoriesTitle: {
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  categoriesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  categoryGridItem: {
+    width: '31%',
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 120,
+    // Use platform-specific shadow
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.12)' }
+      : shadows.md),
+  },
+  categoryGridIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  categoryGridTitle: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  categoryGridSubtitle: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   // Feature styles
   sectionTitle: {
@@ -1126,6 +1216,94 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.regular,
     color: colors.textSecondary,
     textDecorationLine: 'line-through',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: borderRadius.lg,
+    borderTopRightRadius: borderRadius.lg,
+    maxHeight: '5%',
+    minHeight: '52%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lightGray,
+  },
+  modalTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  modalCategoryIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+  },
+  modalTitle: {
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.textPrimary,
+  },
+  modalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceLight,
+  },
+  modalScrollView: {
+    flex: 1,
+  },
+  modalFeaturesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: spacing.md,
+    justifyContent: 'space-between',
+  },
+  modalFeatureItem: {
+    width: '48%',
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    alignItems: 'center',
+    minHeight: 120,
+    justifyContent: 'center',
+  },
+  modalFeatureIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  modalFeatureTitle: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.semiBold,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  modalFeatureDescription: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: typography.lineHeight.sm,
   },
 
 });

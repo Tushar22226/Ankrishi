@@ -85,7 +85,7 @@ const SUCCESS_STORIES = [
     location: 'Gujarat',
     title: 'From Debt to Prosperity',
     summary: 'Overcame ₹5 lakh debt through crop diversification and community support',
-    fullStory: 'After facing crop failure for two consecutive seasons, I was in debt of over ₹5 lakhs and saw no way out. Through the FarmConnect app, I connected with agricultural experts who helped me diversify my crops and implement water-saving techniques. The community support feature connected me with other farmers facing similar challenges, and together we formed a cooperative to share equipment and negotiate better prices. Within two years, I cleared my debt and now run a profitable farm with multiple revenue streams.',
+    fullStory: 'After facing crop failure for two consecutive seasons, I was in debt of over ₹5 lakhs and saw no way out. Through the ankrishi app, I connected with agricultural experts who helped me diversify my crops and implement water-saving techniques. The community support feature connected me with other farmers facing similar challenges, and together we formed a cooperative to share equipment and negotiate better prices. Within two years, I cleared my debt and now run a profitable farm with multiple revenue streams.',
   },
   {
     id: '2',
@@ -93,7 +93,7 @@ const SUCCESS_STORIES = [
     location: 'Karnataka',
     title: 'Single Mother Builds Sustainable Farm',
     summary: 'Created thriving organic farm after losing husband to suicide',
-    fullStory: 'When I lost my husband to suicide due to farm debt, I was left alone with two children and a failing farm. Through government schemes I discovered on FarmConnect, I received training in organic farming techniques. The app\'s financial planning tools helped me budget effectively and apply for a low-interest loan. I started with just half an acre of organic vegetables and now manage five acres with a direct-to-consumer model that gives me stable income. My story shows that even in the darkest times, there is hope for a new beginning.',
+    fullStory: 'When I lost my husband to suicide due to farm debt, I was left alone with two children and a failing farm. Through government schemes I discovered on ankrishi, I received training in organic farming techniques. The app\'s financial planning tools helped me budget effectively and apply for a low-interest loan. I started with just half an acre of organic vegetables and now manage five acres with a direct-to-consumer model that gives me stable income. My story shows that even in the darkest times, there is hope for a new beginning.',
   },
   {
     id: '3',

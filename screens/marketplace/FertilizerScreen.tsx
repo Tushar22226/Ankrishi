@@ -159,7 +159,12 @@ const FertilizerScreen = () => {
 
             <View style={styles.ratingContainer}>
               <Ionicons name="star" size={14} color={colors.secondary} />
-              <Text style={styles.ratingText}>{item.averageRating.toFixed(1)}</Text>
+              <Text style={styles.ratingText}>
+                {item.averageRating.toFixed(1)}
+                {item.ratings && item.ratings.length > 0 && (
+                  <Text style={styles.ratingCount}> ({item.ratings.length})</Text>
+                )}
+              </Text>
             </View>
           </View>
 
@@ -460,6 +465,11 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.medium,
     color: colors.textSecondary,
     marginLeft: spacing.xs,
+  },
+  ratingCount: {
+    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textSecondary,
   },
   productFooter: {
     flexDirection: 'row',

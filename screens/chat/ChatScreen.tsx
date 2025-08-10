@@ -18,6 +18,7 @@ import { colors, typography, spacing, borderRadius } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import { database } from '../../firebase/config';
 import { getPlatformTopSpacing } from '../../utils/platformUtils';
+import { generateGroupCode } from '../../utils/idGenerator';
 
 // Message interface
 interface Message {
@@ -366,7 +367,7 @@ const ChatScreen = () => {
                   logo: recipientPhoto || null,
                   members: groupDetails?.memberCount || Object.keys(participantDetails).length || 1,
                   location: groupDetails?.location || 'Unknown location',
-                  code: groupDetails?.code || `FG${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
+                  code: groupDetails?.code || generateGroupCode(recipientId.replace('group_', '')),
                   tags: groupDetails?.tags || ['chat', 'group'],
                   adminId: groupDetails?.adminId || user.uid,
                   createdBy: groupDetails?.createdBy || user.uid,

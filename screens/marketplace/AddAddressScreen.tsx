@@ -86,7 +86,10 @@ const AddAddressScreen = () => {
         [
           {
             text: 'OK',
-            onPress: () => navigation.goBack(),
+            onPress: () => {
+              // Navigate back to the MultiProductCheckout screen
+              navigation.navigate('Marketplace', { screen: 'MultiProductCheckout' } as never);
+            },
           },
         ]
       );

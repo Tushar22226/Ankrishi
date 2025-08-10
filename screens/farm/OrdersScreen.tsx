@@ -269,9 +269,11 @@ const OrdersScreen = () => {
     };
 
     return (
-      <TouchableOpacity
+      <Card
         style={styles.orderCard}
         onPress={handleOrderPress}
+        elevation="medium"
+        borderRadius={borderRadius.lg}
       >
         <View style={styles.orderHeader}>
           <View style={styles.orderType}>
@@ -303,6 +305,11 @@ const OrdersScreen = () => {
         </View>
 
         <View style={styles.orderContent}>
+          <View style={styles.orderIdContainer}>
+            <Text style={styles.orderIdLabel}>Order ID:</Text>
+            <Text style={styles.orderId}>{item.id.substring(0, 8)}...</Text>
+          </View>
+
           <Text style={styles.orderItems}>
             {itemsSummary}
           </Text>
@@ -331,7 +338,7 @@ const OrdersScreen = () => {
             </Text>
           </View>
         </View>
-      </TouchableOpacity>
+      </Card>
     );
   };
 
@@ -517,23 +524,29 @@ const styles = StyleSheet.create({
   },
   ordersList: {
     padding: spacing.md,
+    paddingBottom: spacing.xl,
   },
   orderCard: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.md,
     marginBottom: spacing.md,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.veryLightGray,
   },
   orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
+    borderBottomColor: colors.veryLightGray,
+    backgroundColor: colors.surfaceLight,
   },
   orderType: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: colors.veryLightGray,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
   },
   orderTypeText: {
     fontSize: typography.fontSize.sm,
@@ -543,6 +556,9 @@ const styles = StyleSheet.create({
   orderStatus: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
   },
   orderStatusText: {
     fontSize: typography.fontSize.sm,
@@ -551,6 +567,7 @@ const styles = StyleSheet.create({
   },
   orderContent: {
     padding: spacing.md,
+    backgroundColor: colors.white,
   },
   orderItems: {
     fontSize: typography.fontSize.md,
@@ -570,10 +587,30 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.medium,
     color: colors.textSecondary,
   },
+  orderIdContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  orderIdLabel: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.textSecondary,
+    marginRight: spacing.xs,
+  },
+  orderId: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textPrimary,
+  },
   orderFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.veryLightGray,
   },
   orderDate: {
     fontSize: typography.fontSize.sm,

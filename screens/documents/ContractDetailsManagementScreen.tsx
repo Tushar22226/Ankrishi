@@ -88,7 +88,7 @@ const ContractDetailsManagementScreen = () => {
   const getStatusColor = (status: string): string => {
     switch (status) {
       case 'active':
-        return colors.success;
+        return colors.primary;
       case 'pending':
         return colors.warning;
       case 'completed':
@@ -201,7 +201,7 @@ const ContractDetailsManagementScreen = () => {
         </Text>
       </View>
 
-      {/* Tabs */}
+      {/* Simplified Tabs */}
       <View style={styles.tabsContainer}>
         <TouchableOpacity
           style={[
@@ -210,6 +210,12 @@ const ContractDetailsManagementScreen = () => {
           ]}
           onPress={() => setActiveTab('overview')}
         >
+          <Ionicons
+            name="document-text-outline"
+            size={18}
+            color={activeTab === 'overview' ? colors.primary : colors.textSecondary}
+            style={styles.tabIcon}
+          />
           <Text
             style={[
               styles.tabButtonText,
@@ -227,6 +233,12 @@ const ContractDetailsManagementScreen = () => {
           ]}
           onPress={() => setActiveTab('deliveries')}
         >
+          <Ionicons
+            name="cube-outline"
+            size={18}
+            color={activeTab === 'deliveries' ? colors.primary : colors.textSecondary}
+            style={styles.tabIcon}
+          />
           <Text
             style={[
               styles.tabButtonText,
@@ -244,6 +256,12 @@ const ContractDetailsManagementScreen = () => {
           ]}
           onPress={() => setActiveTab('payments')}
         >
+          <Ionicons
+            name="cash-outline"
+            size={18}
+            color={activeTab === 'payments' ? colors.primary : colors.textSecondary}
+            style={styles.tabIcon}
+          />
           <Text
             style={[
               styles.tabButtonText,
@@ -253,8 +271,6 @@ const ContractDetailsManagementScreen = () => {
             Payments
           </Text>
         </TouchableOpacity>
-
-
       </View>
 
       {/* Tab Content */}
@@ -347,6 +363,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderBottomWidth: 1,
     borderBottomColor: colors.lightGray,
+    marginBottom: spacing.sm,
   },
   contractTitleContainer: {
     flexDirection: 'row',
@@ -364,6 +381,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.sm,
+    marginLeft: spacing.sm,
   },
   statusText: {
     fontSize: typography.fontSize.xs,
@@ -381,18 +399,25 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.lightGray,
     paddingHorizontal: spacing.md,
+    justifyContent: 'space-around',
+    marginBottom: spacing.sm,
   },
   tabButton: {
     paddingVertical: spacing.md,
-    marginRight: spacing.lg,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
+    alignItems: 'center',
+    flex: 1,
   },
   activeTabButton: {
     borderBottomColor: colors.primary,
+    backgroundColor: colors.surfaceLight,
+  },
+  tabIcon: {
+    marginBottom: spacing.xs,
   },
   tabButtonText: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily.medium,
     color: colors.textSecondary,
   },
@@ -402,6 +427,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
     padding: spacing.md,
+    backgroundColor: colors.background,
   },
 });
 

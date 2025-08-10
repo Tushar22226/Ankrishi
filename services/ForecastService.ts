@@ -889,21 +889,55 @@ class ForecastService {
 
       // Add crop recommendation
       if (cropRecommendations.length > 0) {
-        // Get top 2 crop recommendations
-        const topCrops = cropRecommendations.slice(0, 2);
+        // Categorize crops by type
+        const cerealCrops = cropRecommendations.filter(crop =>
+          ['Rice', 'Wheat', 'Maize', 'Bajra', 'Jowar'].includes(crop.cropName));
+        const vegetableCrops = cropRecommendations.filter(crop =>
+          ['Potato', 'Tomato', 'Onion', 'Cauliflower', 'Brinjal'].includes(crop.cropName));
+        const fruitCrops = cropRecommendations.filter(crop =>
+          ['Mango', 'Banana'].includes(crop.cropName));
+        const cashCrops = cropRecommendations.filter(crop =>
+          ['Cotton', 'Sugarcane', 'Soybean'].includes(crop.cropName));
+        const pulseCrops = cropRecommendations.filter(crop =>
+          ['Moong Dal', 'Masoor Dal', 'Chana', 'Toor Dal', 'Urad Dal'].includes(crop.cropName));
 
-        for (const topCrop of topCrops) {
-          // Only add if suitability is good
-          if (topCrop.suitabilityScore > 0.6) {
+        // Try to get one recommendation from each category if available
+        const categories = [cerealCrops, vegetableCrops, fruitCrops, cashCrops, pulseCrops];
+        const selectedCrops: CropRecommendation[] = [];
+
+        // Select the best crop from each category
+        for (const category of categories) {
+          if (category.length > 0) {
+            // Sort by suitability and take the best one
+            const bestCrop = category.sort((a, b) => b.suitabilityScore - a.suitabilityScore)[0];
+            if (bestCrop.suitabilityScore > 0.6 && !selectedCrops.includes(bestCrop)) {
+              selectedCrops.push(bestCrop);
+            }
+          }
+        }
+
+        // If we don't have enough crops, add the top ones regardless of category
+        if (selectedCrops.length < 3) {
+          const remainingCrops = cropRecommendations
+            .filter(crop => !selectedCrops.includes(crop))
+            .sort((a, b) => b.suitabilityScore - a.suitabilityScore)
+            .slice(0, 3 - selectedCrops.length);
+
+          selectedCrops.push(...remainingCrops);
+        }
+
+        // Add recommendations for selected crops
+        for (const crop of selectedCrops) {
+          if (crop.suitabilityScore > 0.6) {
             recommendations.push(
-              `Based on AI analysis, ${topCrop.cropName} is highly suitable (${(topCrop.suitabilityScore * 100).toFixed(0)}% match) for planting in your area with expected yields of ${topCrop.expectedYield.min.toFixed(1)}-${topCrop.expectedYield.max.toFixed(1)} ${topCrop.expectedYield.unit}.`
+              `Based on AI analysis, ${crop.cropName} is highly suitable (${(crop.suitabilityScore * 100).toFixed(0)}% match) for planting in your area with expected yields of ${crop.expectedYield.min.toFixed(1)}-${crop.expectedYield.max.toFixed(1)} ${crop.expectedYield.unit}.`
             );
 
             // Add risk warning if there's a high-impact risk
-            const highRisks = topCrop.risks.filter(risk => risk.impact === 'high' && risk.probability > 0.5);
+            const highRisks = crop.risks.filter(risk => risk.impact === 'high' && risk.probability > 0.5);
             if (highRisks.length > 0) {
               recommendations.push(
-                `Warning: ${topCrop.cropName} cultivation in your area has a ${(highRisks[0].probability * 100).toFixed(0)}% risk of ${highRisks[0].name}. Mitigation: ${highRisks[0].mitigation}`
+                `Warning: ${crop.cropName} cultivation in your area has a ${(highRisks[0].probability * 100).toFixed(0)}% risk of ${highRisks[0].name}. Mitigation: ${highRisks[0].mitigation}`
               );
             }
           }
@@ -913,19 +947,23 @@ class ForecastService {
       // 3. Get AI market price forecasts
       const marketForecasts = await AIMarketForecastService.getMarketPriceForecasts(userLocation);
 
-      // Add price-based recommendations
-      for (const forecast of marketForecasts) {
-        if (Math.abs(forecast.priceChangePercentage) > 5) {
-          const direction = forecast.priceChangePercentage > 0 ? 'rise' : 'fall';
-          const changePercent = Math.abs(forecast.priceChangePercentage).toFixed(1);
+      // Add price-based recommendations for multiple crops
+      // Sort forecasts by absolute price change percentage (highest first)
+      const sortedForecasts = [...marketForecasts].sort((a, b) =>
+        Math.abs(b.priceChangePercentage) - Math.abs(a.priceChangePercentage)
+      );
 
-          recommendations.push(
-            `AI Market Forecast: ${forecast.productName} prices are expected to ${direction} by ${changePercent}% in the coming weeks. ${forecast.recommendation}`
-          );
+      // Get top 3 forecasts with significant price changes
+      const significantForecasts = sortedForecasts.filter(f => Math.abs(f.priceChangePercentage) > 5).slice(0, 3);
 
-          // Only add one market recommendation to avoid overwhelming the user
-          break;
-        }
+      // Add recommendations for each significant forecast
+      for (const forecast of significantForecasts) {
+        const direction = forecast.priceChangePercentage > 0 ? 'rise' : 'fall';
+        const changePercent = Math.abs(forecast.priceChangePercentage).toFixed(1);
+
+        recommendations.push(
+          `AI Market Forecast: ${forecast.productName} prices are expected to ${direction} by ${changePercent}% in the coming weeks. ${forecast.recommendation}`
+        );
       }
 
       // 4. Add seasonal farming tips based on current month

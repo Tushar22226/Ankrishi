@@ -9,12 +9,16 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { colors, typography, spacing, borderRadius, shadows } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import Card from '../../components/Card';
 import { getPlatformTopSpacing } from '../../utils/platformUtils';
 import LoadingQuote from '../../components/LoadingQuote';
+import FarmService from '../../services/FarmService';
+
+// Define navigation type
+type FarmNavigationProp = NavigationProp<any>;
 
 // Mock farm data
 const mockFarmData = {
@@ -110,7 +114,7 @@ const mockFarmData = {
 };
 
 const MyFarmScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<FarmNavigationProp>();
   const { userProfile } = useAuth();
 
   // State
@@ -124,17 +128,39 @@ const MyFarmScreen = () => {
 
   // Load farm data
   const loadFarmData = async () => {
+    if (!userProfile?.uid) return;
+
     try {
       setLoading(true);
 
-      // In a real app, we would fetch data from a service
-      // For now, let's use mock data
-      setTimeout(() => {
-        setFarmData(mockFarmData);
-        setLoading(false);
-      }, 1000);
+      // Get farm data from Firebase
+      const farmData = await FarmService.getFarmData(userProfile.uid);
+
+      if (farmData) {
+        setFarmData(farmData);
+      } else {
+        // Create a new farm if none exists
+        const newFarm = await FarmService.createFarm(userProfile.uid, {
+          name: userProfile.farmName || 'My Farm',
+          location: {
+            address: userProfile.location?.address || '',
+            coordinates: {
+              latitude: userProfile.location?.latitude || 18.5204,
+              longitude: userProfile.location?.longitude || 73.8567,
+            }
+          },
+          size: 5.5,
+          sizeUnit: 'acre',
+          farmingMethod: 'conventional',
+        });
+
+        setFarmData(newFarm);
+      }
     } catch (error) {
       console.error('Error loading farm data:', error);
+      // Fallback to mock data if there's an error
+      setFarmData(mockFarmData);
+    } finally {
       setLoading(false);
     }
   };

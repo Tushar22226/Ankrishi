@@ -714,43 +714,127 @@ class AIMarketForecastService {
       Math.round(crop.basePrice * 0.7) // Price can't go below 70% of base price
     );
 
-    // Generate factors that influenced the forecast
+    // Generate crop-specific factors that influenced the forecast
     const factors = [];
 
-    // Seasonal factors
+    // Seasonal factors with crop-specific context
     if (Math.abs(seasonalChange) > 0.05) {
-      factors.push({
-        name: seasonalChange > 0
+      let seasonalReason = '';
+
+      // Crop-specific seasonal explanations
+      if (crop.id === 'rice' || crop.id === 'wheat' || crop.id === 'maize') {
+        seasonalReason = seasonalChange > 0
+          ? `Peak demand season for ${crop.name} - higher consumption and export demand`
+          : `Harvest season for ${crop.name} - increased supply from fresh harvest`;
+      } else if (crop.id === 'potato' || crop.id === 'onion') {
+        seasonalReason = seasonalChange > 0
+          ? `Storage depletion period - limited supply from previous harvest`
+          : `Fresh harvest season - abundant supply in markets`;
+      } else if (crop.id.includes('dal') || crop.id === 'moong' || crop.id === 'masoor' || crop.id === 'chana' || crop.id === 'toor' || crop.id === 'urad') {
+        seasonalReason = seasonalChange > 0
+          ? `Festival season demand surge for pulses and traditional cooking`
+          : `Post-harvest period with increased market arrivals`;
+      } else if (crop.id === 'tomato' || crop.id === 'cauliflower' || crop.id === 'brinjal') {
+        seasonalReason = seasonalChange > 0
+          ? `Off-season period with reduced production and higher demand`
+          : `Peak growing season with abundant supply`;
+      } else {
+        seasonalReason = seasonalChange > 0
           ? `Seasonal demand increase in ${forecastMonth}`
-          : `Seasonal supply increase in ${forecastMonth}`,
+          : `Seasonal supply increase in ${forecastMonth}`;
+      }
+
+      factors.push({
+        name: seasonalReason,
         impact: seasonalChange > 0 ? 'positive' : 'negative',
         weight: Math.abs(seasonalChange) * 5
       });
     }
 
-    // Weather factors
+    // Weather factors with crop-specific sensitivity
     if (Math.abs(temperatureImpact) > 0.02) {
+      let tempReason = '';
+
+      if (crop.weatherSensitivity.temperature > 0) {
+        // Crops that benefit from higher temperatures
+        tempReason = avgTemperature > 25
+          ? `Favorable warm weather boosting ${crop.name} quality and reducing supply disruptions`
+          : `Cooler temperatures may reduce ${crop.name} production efficiency`;
+      } else {
+        // Crops that suffer from higher temperatures
+        tempReason = avgTemperature > 25
+          ? `High temperatures stressing ${crop.name} crops, potentially reducing yields`
+          : `Optimal cooler temperatures supporting better ${crop.name} production`;
+      }
+
       factors.push({
-        name: `${avgTemperature > 25 ? 'Higher' : 'Lower'} than optimal temperature`,
+        name: tempReason,
         impact: temperatureImpact > 0 ? 'positive' : 'negative',
         weight: Math.abs(temperatureImpact) * 10
       });
     }
 
     if (Math.abs(rainfallImpact) > 0.02) {
+      let rainReason = '';
+
+      if (crop.weatherSensitivity.rainfall > 0) {
+        // Crops that benefit from more rainfall
+        rainReason = totalRainfall > 50
+          ? `Adequate rainfall supporting healthy ${crop.name} growth and reducing irrigation costs`
+          : `Below normal rainfall may stress ${crop.name} crops, increasing production costs`;
+      } else {
+        // Crops that suffer from excess rainfall
+        rainReason = totalRainfall > 50
+          ? `Excess rainfall may damage ${crop.name} crops and disrupt harvesting operations`
+          : `Favorable dry conditions supporting ${crop.name} quality and harvest efficiency`;
+      }
+
       factors.push({
-        name: `${totalRainfall > 50 ? 'Above average' : 'Below average'} rainfall`,
+        name: rainReason,
         impact: rainfallImpact > 0 ? 'positive' : 'negative',
         weight: Math.abs(rainfallImpact) * 10
       });
     }
 
-    // Storage and supply factors
+    // Storage and supply factors with crop-specific context
     if (crop.storageLife < 30 && forecastDays > crop.storageLife / 2) {
       factors.push({
-        name: 'Limited storage life affecting supply',
+        name: `${crop.name} has very short storage life (${crop.storageLife} days) - forcing quick sales and reducing supply flexibility`,
         impact: 'positive', // Short storage life tends to increase prices
         weight: 0.3
+      });
+    } else if (crop.storageLife > 300) {
+      factors.push({
+        name: `${crop.name} has excellent storage capacity (${crop.storageLife} days) - allowing farmers to time sales strategically`,
+        impact: 'negative', // Good storage tends to stabilize/reduce prices
+        weight: 0.2
+      });
+    }
+
+    // Volatility-based factors
+    if (crop.volatility > 0.6) {
+      factors.push({
+        name: `${crop.name} is highly volatile due to perishable nature and demand fluctuations`,
+        impact: 'neutral',
+        weight: crop.volatility
+      });
+    }
+
+    // Substitute crop factors
+    if (crop.substitutes && crop.substitutes.length > 0) {
+      factors.push({
+        name: `Market competition from substitute crops: ${crop.substitutes.join(', ')}`,
+        impact: 'negative',
+        weight: 0.15
+      });
+    }
+
+    // Supply-demand sensitivity
+    if (crop.supplyDemandFactor > 0.7) {
+      factors.push({
+        name: `${crop.name} prices highly sensitive to supply-demand imbalances due to inelastic demand`,
+        impact: 'neutral',
+        weight: crop.supplyDemandFactor * 0.3
       });
     }
 

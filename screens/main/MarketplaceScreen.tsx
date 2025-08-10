@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/native';
 import { colors, typography, spacing, borderRadius, shadows } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
+import { useOrderNotification } from '../../context/OrderNotificationContext';
 import MarketplaceService from '../../services/MarketplaceService';
 import CartService from '../../services/CartService';
 import { Product, ProductCategory } from '../../models/Product';
@@ -25,6 +26,7 @@ import LoadingQuote from '../../components/LoadingQuote';
 const MarketplaceScreen = () => {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const { userProfile } = useAuth();
+  const { hasPendingOrders } = useOrderNotification();
 
   // State
   const [loading, setLoading] = useState(true);
@@ -43,10 +45,10 @@ const MarketplaceScreen = () => {
     }
   }, [userProfile?.uid]);
 
-  // Filter products when search query or active category changes
+  // Filter products when search query, active category, or user role changes
   useEffect(() => {
     filterProducts();
-  }, [searchQuery, activeCategory, products]);
+  }, [searchQuery, activeCategory, products, userProfile?.role]);
 
   // Load cart count
   const loadCartCount = async () => {
@@ -105,8 +107,22 @@ const MarketplaceScreen = () => {
 
       const uniqueProducts = Array.from(new Map(productsWithVerification.map(item => [item.id, item])).values());
 
+      // Filter products based on user role
+      let filteredByRoleProducts = uniqueProducts;
+      if (userProfile?.role === 'farmer') {
+        // Farmers see fertilizers and equipment
+        filteredByRoleProducts = uniqueProducts.filter(product =>
+          product.category === 'fertilizer' || product.category === 'equipment'
+        );
+      } else {
+        // Non-farmers (vendors, buyers, etc.) see only produce
+        filteredByRoleProducts = uniqueProducts.filter(product =>
+          product.category === 'produce'
+        );
+      }
+
       // Set products state
-      setProducts(uniqueProducts);
+      setProducts(filteredByRoleProducts);
 
     } catch (error) {
       console.error('Error loading data:', error);
@@ -136,6 +152,17 @@ const MarketplaceScreen = () => {
           product.description.toLowerCase().includes(query) ||
           product.tags.some(tag => tag.toLowerCase().includes(query))
       );
+    }
+
+    // Additional role-based filtering (in case the user switches roles while on this screen)
+    if (userProfile?.role === 'farmer') {
+      // Farmers see only fertilizers and equipment
+      filtered = filtered.filter(product =>
+        product.category === 'fertilizer' || product.category === 'equipment'
+      );
+    } else {
+      // Non-farmers see only produce
+      filtered = filtered.filter(product => product.category === 'produce');
     }
 
     setFilteredProducts(filtered);
@@ -282,13 +309,56 @@ const MarketplaceScreen = () => {
             <TouchableOpacity
               style={styles.iconButton}
               onPress={() => navigation.navigate('UserProducts')}
+              activeOpacity={0.7}
             >
               <Ionicons name="basket-outline" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
 
             <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => {
+                // Navigate to Orders screen based on user role
+                if (userProfile?.role === 'farmer') {
+                  navigation.navigate('My Farm', { screen: 'Orders' });
+                } else {
+                  // For vendors and buyers, use the marketplace Orders screen
+                  navigation.navigate('Marketplace', { screen: 'Orders' });
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={{ position: 'relative' }}>
+                <Ionicons name="document-text-outline" size={24} color={colors.textPrimary} />
+                {hasPendingOrders && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: -4,
+                      right: -4,
+                      backgroundColor: '#FF0000',
+                      width: 10,
+                      height: 10,
+                      borderRadius: 5,
+                      borderWidth: 1,
+                      borderColor: 'white',
+                    }}
+                  />
+                )}
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => navigation.navigate('Marketplace', { screen: 'Requirements' })}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="document-text" size={24} color={colors.textPrimary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={styles.cartButton}
               onPress={() => navigation.navigate('Cart')}
+              activeOpacity={0.7}
             >
               <Ionicons name="cart-outline" size={24} color={colors.textPrimary} />
               {cartCount > 0 && (
@@ -318,6 +388,16 @@ const MarketplaceScreen = () => {
         </View>
       </View>
 
+      {/* View Prelisted Products Button - Visible to all users */}
+      <TouchableOpacity
+        style={styles.yourProductsButton}
+        onPress={() => navigation.navigate('ViewPrelistedProducts' as never)}
+      >
+        <Ionicons name="list-outline" size={20} color={colors.primary} />
+        <Text style={styles.yourProductsText}>View Prelisted Products</Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+      </TouchableOpacity>
+
       <View style={styles.categoriesContainer}>
         <ScrollView
           horizontal
@@ -325,9 +405,23 @@ const MarketplaceScreen = () => {
           contentContainerStyle={styles.categoriesScrollContent}
         >
           {renderCategoryTab('all', 'All', 'grid')}
-          {renderCategoryTab('fertilizer', 'Fertilizers', 'leaf')}
-          {renderCategoryTab('equipment', 'Equipment', 'construct')}
-          {renderCategoryTab('produce', 'Produce', 'nutrition')}
+          {userProfile?.role === 'farmer' ? (
+            // Show fertilizer and equipment tabs for farmers
+            <>
+              {renderCategoryTab('fertilizer', 'Fertilizers', 'leaf')}
+              {renderCategoryTab('equipment', 'Equipment', 'construct')}
+            </>
+          ) : (
+            // Show only produce tab for non-farmers
+            renderCategoryTab('produce', 'Produce', 'nutrition')
+          )}
+          <TouchableOpacity
+            style={styles.categoryTab}
+            onPress={() => navigation.navigate('Marketplace', { screen: 'Requirements' })}
+          >
+            <Ionicons name="document-text" size={20} color={colors.mediumGray} />
+            <Text style={styles.categoryTabText}>Requirements</Text>
+          </TouchableOpacity>
         </ScrollView>
       </View>
 
@@ -354,22 +448,31 @@ const MarketplaceScreen = () => {
         }
       />
 
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => {
-          // Navigate to AddProduct screen in the Marketplace stack
-          // This ensures we're using the correct navigator
-          if (navigation.canGoBack()) {
-            // If we can go back, we're already in the Marketplace stack
-            navigation.navigate('AddProduct');
-          } else {
-            // Otherwise, we need to specify the full path
-            navigation.navigate('Marketplace', { screen: 'AddProduct' });
-          }
-        }}
-      >
-        <Ionicons name="add" size={24} color={colors.white} />
-      </TouchableOpacity>
+      {userProfile?.role && (
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => {
+            // Navigate to AddProduct screen for farmers, AddRequirement for vendors/buyers
+            if (userProfile?.role === 'farmer') {
+              // Navigate to AddProduct screen
+              if (navigation.canGoBack()) {
+                navigation.navigate('AddProduct');
+              } else {
+                navigation.navigate('Marketplace', { screen: 'AddProduct' });
+              }
+            } else if (userProfile?.role === 'vendor' || userProfile?.role === 'buyer') {
+              // Navigate to AddRequirement screen
+              if (navigation.canGoBack()) {
+                navigation.navigate('AddRequirement');
+              } else {
+                navigation.navigate('Marketplace', { screen: 'AddRequirement' });
+              }
+            }
+          }}
+        >
+          <Ionicons name="add" size={24} color={colors.white} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -413,12 +516,16 @@ const styles = StyleSheet.create({
   },
   iconButton: {
     position: 'relative',
-    padding: spacing.xs,
+    padding: spacing.sm,
     marginRight: spacing.sm,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.surfaceLight,
   },
   cartButton: {
     position: 'relative',
-    padding: spacing.xs,
+    padding: spacing.sm,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.surfaceLight,
   },
   cartBadge: {
     position: 'absolute',
@@ -630,6 +737,24 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.regular,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  yourProductsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.white,
+    padding: spacing.md,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    borderRadius: 8,
+    ...shadows.small,
+  },
+  yourProductsText: {
+    flex: 1,
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.primary,
+    marginLeft: spacing.sm,
   },
   addButton: {
     position: 'absolute',

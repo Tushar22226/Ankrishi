@@ -9,6 +9,10 @@ import {
   Alert,
   TextInput,
   FlatList,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -18,187 +22,11 @@ import Card from '../../components/Card';
 import Button from '../../components/Button';
 import LoadingQuote from '../../components/LoadingQuote';
 import { getPlatformTopSpacing } from '../../utils/platformUtils';
+import SchemeService, { GovernmentScheme } from '../../services/SchemeService';
+import LocationService from '../../services/LocationService';
+import governmentSchemesData from '../../data/governmentSchemes.json';
 
-// Mock schemes data
-const mockSchemes = [
-  {
-    id: '1',
-    title: 'Pradhan Mantri Fasal Bima Yojana (PMFBY)',
-    category: 'insurance',
-    ministry: 'Ministry of Agriculture & Farmers Welfare',
-    description: 'A crop insurance scheme that provides financial support to farmers in case of crop failure due to natural calamities, pests, and diseases.',
-    eligibility: [
-      'All farmers growing notified crops in notified areas',
-      'Both loanee and non-loanee farmers are eligible',
-      'Sharecroppers and tenant farmers are also eligible',
-    ],
-    benefits: [
-      'Insurance coverage and financial support to farmers in the event of crop failure',
-      'Stabilizing the income of farmers to ensure their continuance in farming',
-      'Encouraging farmers to adopt innovative and modern agricultural practices',
-    ],
-    applicationProcess: [
-      'Approach the nearest bank branch or insurance company',
-      'Fill the application form and submit required documents',
-      'Pay the premium amount',
-    ],
-    documents: [
-      'Aadhaar Card',
-      'Land Records (7/12 extract)',
-      'Bank Account Details',
-      'Passport Size Photograph',
-    ],
-    lastDate: new Date(Date.now() + 86400000 * 30), // 30 days from now
-    status: 'active',
-    website: 'https://pmfby.gov.in/',
-    successRate: 85,
-    relevanceScore: 95,
-    applicationStatus: null,
-  },
-  {
-    id: '2',
-    title: 'PM Kisan Samman Nidhi Yojana',
-    category: 'financial',
-    ministry: 'Ministry of Agriculture & Farmers Welfare',
-    description: 'A central sector scheme to provide income support to all landholding farmers\' families in the country to supplement their financial needs.',
-    eligibility: [
-      'All landholding farmers\' families, which have cultivable landholding in their names',
-      'Small and marginal farmer families having combined landholding up to 2 hectares',
-      'Institutional landholders are not eligible',
-    ],
-    benefits: [
-      'Direct income support of Rs. 6,000 per year to eligible farmer families',
-      'Amount paid in three equal installments of Rs. 2,000 each',
-      'Direct transfer to bank accounts of beneficiaries',
-    ],
-    applicationProcess: [
-      'Apply online through the PM-KISAN portal or mobile app',
-      'Visit your local Common Service Center (CSC)',
-      'Contact your local agriculture officer for assistance',
-    ],
-    documents: [
-      'Aadhaar Card',
-      'Land Records',
-      'Bank Account Details',
-      'Passport Size Photograph',
-    ],
-    lastDate: null, // Ongoing scheme
-    status: 'active',
-    website: 'https://pmkisan.gov.in/',
-    successRate: 92,
-    relevanceScore: 90,
-    applicationStatus: 'approved',
-  },
-  {
-    id: '3',
-    title: 'Kisan Credit Card (KCC)',
-    category: 'credit',
-    ministry: 'Ministry of Finance',
-    description: 'A credit scheme to provide adequate and timely credit support to farmers for their cultivation needs.',
-    eligibility: [
-      'All farmers - individual/joint borrowers who are owner cultivators',
-      'Tenant farmers, oral lessees & share croppers',
-      'SHGs or Joint Liability Groups of farmers including tenant farmers, share croppers etc.',
-    ],
-    benefits: [
-      'Short-term credit for cultivation of crops',
-      'Post-harvest expenses',
-      'Working capital for maintenance of farm assets',
-      'Investment credit for agriculture and allied activities',
-    ],
-    applicationProcess: [
-      'Apply at your nearest bank branch',
-      'Submit the application form along with required documents',
-      'Bank will process your application and issue the KCC',
-    ],
-    documents: [
-      'Passport size photograph',
-      'Land records / title deeds',
-      'Identity proof (Aadhaar card, voter ID, etc.)',
-      'Address proof',
-    ],
-    lastDate: null, // Ongoing scheme
-    status: 'active',
-    website: 'https://www.nabard.org/content.aspx?id=591',
-    successRate: 88,
-    relevanceScore: 85,
-    applicationStatus: 'in_progress',
-  },
-  {
-    id: '4',
-    title: 'Soil Health Card Scheme',
-    category: 'technical',
-    ministry: 'Ministry of Agriculture & Farmers Welfare',
-    description: 'A scheme to issue soil health cards to farmers containing crop-wise recommendations for nutrients and fertilizers to help farmers improve productivity through judicious use of inputs.',
-    eligibility: [
-      'All farmers across the country',
-    ],
-    benefits: [
-      'Soil health assessment',
-      'Recommendations for appropriate dosage of nutrients',
-      'Improvement in soil health and crop yield',
-      'Promotion of sustainable farming practices',
-    ],
-    applicationProcess: [
-      'Contact local agriculture department or Krishi Vigyan Kendra',
-      'Submit soil samples for testing',
-      'Receive soil health card with recommendations',
-    ],
-    documents: [
-      'Aadhaar Card',
-      'Land Records',
-    ],
-    lastDate: null, // Ongoing scheme
-    status: 'active',
-    website: 'https://soilhealth.dac.gov.in/',
-    successRate: 90,
-    relevanceScore: 75,
-    applicationStatus: null,
-  },
-  {
-    id: '5',
-    title: 'Agriculture Infrastructure Fund',
-    category: 'infrastructure',
-    ministry: 'Ministry of Agriculture & Farmers Welfare',
-    description: 'A financing facility for the creation of post-harvest management infrastructure and community farming assets.',
-    eligibility: [
-      'Farmers',
-      'Primary Agricultural Credit Societies (PACS)',
-      'Marketing Cooperative Societies',
-      'Farmer Producers Organizations (FPOs)',
-      'Self Help Groups (SHGs)',
-      'Joint Liability Groups (JLGs)',
-      'Multipurpose Cooperative Societies',
-      'Agri-entrepreneurs',
-      'Start-ups',
-      'Aggregation Infrastructure Providers',
-    ],
-    benefits: [
-      'Interest subvention of 3% per annum, up to a limit of Rs. 2 crore',
-      'Credit guarantee coverage under CGTMSE scheme for loans up to Rs. 2 crore',
-      'Funding for setting up of cold stores and chains, warehousing, silos, etc.',
-    ],
-    applicationProcess: [
-      'Apply online through the Agriculture Infrastructure Fund portal',
-      'Submit the application form along with project details',
-      'Bank will appraise the project and sanction the loan',
-    ],
-    documents: [
-      'Identity proof',
-      'Address proof',
-      'Land documents (if applicable)',
-      'Project report',
-      'Cost estimates',
-      'NOCs/permissions from local authorities',
-    ],
-    lastDate: new Date(2029, 3, 1), // April 1, 2029
-    status: 'active',
-    website: 'https://agriinfra.dac.gov.in/',
-    successRate: 70,
-    relevanceScore: 60,
-    applicationStatus: null,
-  },
-];
+// Scheme categories and application status options are defined here
 
 // Scheme categories
 const schemeCategories = [
@@ -222,11 +50,15 @@ const SchemeNavigatorScreen = () => {
   const navigation = useNavigation();
   const { userProfile } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [schemes, setSchemes] = useState(mockSchemes);
-  const [filteredSchemes, setFilteredSchemes] = useState(mockSchemes);
+  const [schemes, setSchemes] = useState<GovernmentScheme[]>([]);
+  const [filteredSchemes, setFilteredSchemes] = useState<GovernmentScheme[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [expandedScheme, setExpandedScheme] = useState<string | null>(null);
+  const [farmerIncome, setFarmerIncome] = useState('');
+  const [showIncomeModal, setShowIncomeModal] = useState(false);
+  const [incomeError, setIncomeError] = useState('');
+  const [locationLoading, setLocationLoading] = useState(false);
 
   // Load schemes data
   useEffect(() => {
@@ -234,12 +66,39 @@ const SchemeNavigatorScreen = () => {
       try {
         setLoading(true);
 
-        // In a real app, this would fetch data from the backend
-        // For now, we'll use mock data with a simulated delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Load schemes from the local JSON file
+        console.log('Loading schemes from local JSON file');
+        const allSchemes = governmentSchemesData.schemes.map((scheme, index) => ({
+          ...scheme,
+          relevanceScore: 100 - index // Add a relevance score based on order in the file
+        }));
+        console.log('Loaded schemes from JSON file:', allSchemes.length);
 
-        setSchemes(mockSchemes);
-        setFilteredSchemes(mockSchemes);
+        // Sort by relevance score
+        const sortedSchemes = [...allSchemes].sort((a, b) =>
+          (b.relevanceScore || 0) - (a.relevanceScore || 0)
+        );
+        console.log('Sorted schemes:', sortedSchemes.length);
+
+        setSchemes(sortedSchemes);
+        setFilteredSchemes(sortedSchemes);
+
+        // Get user's applied schemes (in a real app)
+        if (userProfile?.uid) {
+          const applications = await SchemeService.getUserApplications(userProfile.uid);
+          // Update application status in schemes
+          if (applications.length > 0) {
+            const updatedSchemes = sortedSchemes.map(scheme => {
+              const application = applications.find(app => app.schemeId === scheme.id);
+              if (application) {
+                return { ...scheme, applicationStatus: application.status };
+              }
+              return scheme;
+            });
+            setSchemes(updatedSchemes);
+            setFilteredSchemes(updatedSchemes);
+          }
+        }
       } catch (error) {
         console.error('Error loading schemes data:', error);
         Alert.alert('Error', 'Failed to load government schemes. Please try again.');
@@ -295,6 +154,53 @@ const SchemeNavigatorScreen = () => {
     setSelectedCategory(categoryId);
   };
 
+  // Filter schemes by income and location
+  const filterSchemesByIncomeAndLocation = async () => {
+    try {
+      if (!farmerIncome || isNaN(parseInt(farmerIncome, 10))) {
+        setIncomeError('Please enter a valid income amount');
+        return;
+      }
+
+      setLoading(true);
+      const income = parseInt(farmerIncome, 10);
+
+      // Check if user has location
+      if (!userProfile?.location) {
+        // If no location, just filter by income
+        const filtered = await SchemeService.filterSchemesByIncome(income);
+        setFilteredSchemes(filtered);
+      } else {
+        // Filter by both income and location
+        const filtered = await SchemeService.filterSchemes(income, userProfile.location);
+        setFilteredSchemes(filtered);
+      }
+
+      setLoading(false);
+      setShowIncomeModal(false);
+      setIncomeError('');
+    } catch (error) {
+      console.error('Error filtering schemes:', error);
+      Alert.alert('Error', 'Failed to filter schemes. Please try again.');
+      setLoading(false);
+    }
+  };
+
+  // Handle income input
+  const handleIncomeSubmit = () => {
+    // Validate income
+    if (!farmerIncome || isNaN(parseInt(farmerIncome, 10))) {
+      setIncomeError('Please enter a valid income amount');
+      return;
+    }
+
+    // Clear error
+    setIncomeError('');
+
+    // Filter schemes
+    filterSchemesByIncomeAndLocation();
+  };
+
   // Handle apply for scheme
   const handleApplyForScheme = (schemeId: string) => {
     Alert.alert(
@@ -325,11 +231,55 @@ const SchemeNavigatorScreen = () => {
     );
   };
 
+  // Open website in browser
+  const openWebsite = (url: string) => {
+    if (!url) {
+      Alert.alert('Error', 'Website URL not available');
+      return;
+    }
+
+    // Check if the URL has http/https prefix, add if missing
+    const formattedUrl = url.startsWith('http') ? url : `https://${url}`;
+
+    // Open URL in browser
+    Linking.canOpenURL(formattedUrl).then(supported => {
+      if (supported) {
+        Linking.openURL(formattedUrl);
+      } else {
+        console.log("Don't know how to open URI: " + formattedUrl);
+        Alert.alert('Cannot Open Website', 'The website URL could not be opened.');
+      }
+    }).catch(err => {
+      console.error('Error opening URL:', err);
+      Alert.alert('Error', 'Failed to open website. Please try again.');
+    });
+  };
+
   // Handle check application status
   const handleCheckStatus = (schemeId: string) => {
     const scheme = schemes.find(s => s.id === schemeId);
     if (!scheme) return;
 
+    // Open the scheme website in browser for status check
+    if (scheme.website) {
+      Alert.alert(
+        'Check Status Online',
+        'Would you like to check your application status on the official website?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Open Website',
+            onPress: () => openWebsite(scheme.website),
+          },
+        ]
+      );
+      return;
+    }
+
+    // Fallback if no website is available
     if (scheme.applicationStatus === 'in_progress') {
       Alert.alert(
         'Application Status',
@@ -419,7 +369,37 @@ const SchemeNavigatorScreen = () => {
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Government Schemes</Text>
+        <TouchableOpacity
+          style={styles.filterButton}
+          onPress={() => setShowIncomeModal(true)}
+        >
+          <Ionicons name="filter" size={24} color={colors.primary} />
+        </TouchableOpacity>
       </View>
+
+      {/* Income and Location Info */}
+      {(farmerIncome || userProfile?.location) && (
+        <View style={styles.filterInfoContainer}>
+          {farmerIncome ? (
+            <View style={styles.filterInfoItem}>
+              <Ionicons name="cash-outline" size={16} color={colors.primary} />
+              <Text style={styles.filterInfoText}>Income: ₹{farmerIncome}</Text>
+              <TouchableOpacity onPress={() => setShowIncomeModal(true)}>
+                <Ionicons name="pencil" size={16} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
+          {userProfile?.location ? (
+            <View style={styles.filterInfoItem}>
+              <Ionicons name="location-outline" size={16} color={colors.primary} />
+              <Text style={styles.filterInfoText} numberOfLines={1}>
+                {userProfile.location.address}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      )}
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
@@ -473,7 +453,12 @@ const SchemeNavigatorScreen = () => {
       {/* Schemes List */}
       <ScrollView style={styles.scrollContainer}>
         <View style={styles.schemesContainer}>
-          {filteredSchemes.length > 0 ? (
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.loadingText}>Loading schemes...</Text>
+            </View>
+          ) : filteredSchemes.length > 0 ? (
             filteredSchemes.map(scheme => (
               <Card key={scheme.id} style={styles.schemeCard}>
                 <TouchableOpacity
@@ -595,7 +580,7 @@ const SchemeNavigatorScreen = () => {
                       <Button
                         title="Visit Website"
                         variant="outline"
-                        onPress={() => Alert.alert('Open Website', `This would open ${scheme.website}`)}
+                        onPress={() => openWebsite(scheme.website)}
                         style={styles.websiteButton}
                         leftIcon={<Ionicons name="globe" size={18} color={colors.primary} style={styles.buttonIcon} />}
                       />
@@ -606,20 +591,86 @@ const SchemeNavigatorScreen = () => {
             ))
           ) : (
             <View style={styles.noResultsContainer}>
-              <Ionicons name="search" size={64} color={colors.lightGray} />
-              <Text style={styles.noResultsText}>No schemes found matching your search</Text>
-              <Button
-                title="Clear Filters"
-                onPress={() => {
-                  setSearchQuery('');
-                  setSelectedCategory('all');
-                }}
-                style={styles.clearFiltersButton}
-              />
+              <Ionicons name="document-text-outline" size={64} color={colors.lightGray} />
+              <Text style={styles.noResultsText}>
+                {searchQuery || selectedCategory !== 'all' ?
+                  'No schemes found matching your search' :
+                  'No government schemes available in the database'}
+              </Text>
+              {(searchQuery || selectedCategory !== 'all') && (
+                <Button
+                  title="Clear Filters"
+                  onPress={() => {
+                    setSearchQuery('');
+                    setSelectedCategory('all');
+                  }}
+                  style={styles.clearFiltersButton}
+                />
+              )}
             </View>
           )}
         </View>
       </ScrollView>
+
+      {/* Income Input Modal */}
+      <Modal
+        visible={showIncomeModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowIncomeModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Enter Your Annual Income</Text>
+            <Text style={styles.modalDescription}>
+              This will help us filter government schemes that you are eligible for based on your income.
+              {userProfile?.location ? ' Schemes will also be filtered based on your location.' : ''}
+            </Text>
+
+            <View style={styles.incomeInputContainer}>
+              <Text style={styles.incomePrefix}>₹</Text>
+              <TextInput
+                style={styles.incomeInput}
+                placeholder="Annual Income"
+                value={farmerIncome}
+                onChangeText={setFarmerIncome}
+                keyboardType="numeric"
+                returnKeyType="done"
+              />
+            </View>
+
+            {incomeError ? <Text style={styles.errorText}>{incomeError}</Text> : null}
+
+            {!userProfile?.location && (
+              <View style={styles.locationWarning}>
+                <Ionicons name="warning" size={18} color={colors.warning} />
+                <Text style={styles.locationWarningText}>
+                  Location not set. Schemes will only be filtered by income.
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowIncomeModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.applyButton}
+                onPress={handleIncomeSubmit}
+              >
+                <Text style={styles.applyButtonText}>Apply Filter</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 };
@@ -635,6 +686,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
+    justifyContent: 'space-between',
   },
   backButton: {
     marginRight: spacing.md,
@@ -643,6 +695,35 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.lg,
     fontFamily: typography.fontFamily.bold,
     color: colors.textPrimary,
+    flex: 1,
+  },
+  filterButton: {
+    padding: spacing.xs,
+  },
+  filterInfoContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.surfaceLight,
+  },
+  filterInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    marginRight: spacing.sm,
+    marginBottom: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.lightGray,
+  },
+  filterInfoText: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.textPrimary,
+    marginHorizontal: spacing.xs,
   },
   loadingContainer: {
     flex: 1,
@@ -865,6 +946,109 @@ const styles = StyleSheet.create({
   },
   clearFiltersButton: {
     marginTop: spacing.md,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: spacing.md,
+  },
+  modalContent: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  modalDescription: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+    textAlign: 'center',
+  },
+  incomeInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    backgroundColor: colors.surfaceLight,
+  },
+  incomePrefix: {
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.primary,
+    marginRight: spacing.xs,
+  },
+  incomeInput: {
+    flex: 1,
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textPrimary,
+    paddingVertical: spacing.md,
+  },
+  errorText: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.error,
+    marginBottom: spacing.md,
+  },
+  locationWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.warningLight,
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.md,
+  },
+  locationWarningText: {
+    flex: 1,
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textPrimary,
+    marginLeft: spacing.xs,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    marginRight: spacing.sm,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.lightGray,
+    borderRadius: borderRadius.md,
+  },
+  cancelButtonText: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.textSecondary,
+  },
+  applyButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    marginLeft: spacing.sm,
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+  },
+  applyButtonText: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.white,
   },
 });
 

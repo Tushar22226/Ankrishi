@@ -4,54 +4,53 @@
 
 ### 1. User-Centered Design Process
 
-Ankrishi's development follows a rigorous user-centered design methodology that places farmers at the core of all decision-making:
+For this hackathon, we researched farmer challenges through available resources:
 
-1. **Immersive Field Research**: Our team spent 3 months across 12 villages in Maharashtra conducting:
-   - In-depth interviews with 200+ farmers across different land holding sizes
-   - Shadowing of 50 farmers through their entire selling process
-   - Documentation of pain points in the current agricultural value chain
-   - Observation of existing technology usage patterns among rural communities
+1. Research & Analysis:
+   - Reviewed government reports on agricultural challenges
+   - Watched interviews with farmers on YouTube channels
+   - Analyzed existing agricultural apps and their limitations
+   - Read articles about rural technology adoption barriers
 
-2. **Participatory Design Workshops**: Conducted 15 collaborative design sessions with:
-   - Small and marginal farmers (less than 2 hectares)
-   - Medium-scale farmers (2-10 hectares)
-   - Agricultural vendors and buyers
-   - Local agricultural extension workers
-   - Rural technology adoption specialists
+2. Problem Identification:
+   - Identified key pain points in the current agricultural system
+   - Mapped the journey of produce from farm to consumer
+   - Noted information gaps that affect farmer decision-making
+   - Recognized financial management challenges faced by farmers
 
-3. **Iterative Prototyping**: Developed and refined the platform through:
-   - Paper prototypes tested with 100+ potential users
-   - Low-fidelity digital mockups evaluated for usability
-   - Functional prototypes deployed in controlled environments
-   - Continuous feedback incorporation from all stakeholder groups
+3. Solution Design:
+   - Created wireframes focused on simplicity and accessibility
+   - Designed interfaces that work on basic Android devices
+   - Prioritized features based on core farmer needs
+   - Ensured the app works with intermittent connectivity
 
-4. **Accessibility Optimization**: Ensured the platform works for users with:
-   - Limited digital literacy through intuitive interface design
-   - Varying levels of connectivity through offline functionality
-   - Different language preferences through multilingual support (Hindi, Marathi, English)
-   - Visual impairments through voice-enabled features
+4. Usability Considerations:
+   - Simplified navigation for users with limited digital literacy
+   - Implemented multilingual support (Hindi, Marathi, English)
+   - Minimized data usage for cost-sensitive users
+   - Used visual cues and icons to improve understanding
 
 ### 2. Technology Selection Framework
 
 Ankrishi's technical architecture was selected based on four key criteria:
 
-1. **Scalability**: Ability to grow from serving hundreds to millions of users
+1. Scalability: Ability to grow from serving hundreds to millions of users
    - Firebase backend provides immediate scalability
    - Planned migration path to MongoDB/Redis/CDN at 10,000 users
    - Further evolution to PostgreSQL and custom backend at 25,000 users
 
-2. **Accessibility**: Ensuring technology works in rural Indian context
+2. Accessibility: Ensuring technology works in rural Indian context
    - React Native enables cross-platform deployment on diverse Android devices
    - Optimized for low-bandwidth environments with data-efficient operations
    - Designed for intermittent connectivity with offline-first functionality
 
-3. **Security**: Protecting sensitive user and transaction data
+3. Security: Protecting sensitive user and transaction data
    - End-to-end encryption for all financial transactions
    - Secure authentication with phone number verification
    - Role-based access control for different user types
    - Regular security audits and vulnerability testing
 
-4. **Maintainability**: Supporting long-term development and updates
+4. Maintainability: Supporting long-term development and updates
    - TypeScript for type safety and code quality
    - Modular architecture for feature-by-feature deployment
    - Comprehensive documentation for knowledge transfer
@@ -63,21 +62,21 @@ Ankrishi's technical architecture was selected based on four key criteria:
 
 Ankrishi employs a deliberate, phased scaling approach:
 
-1. **Village Selection Criteria**:
+1. Village Selection Criteria:
    - Agricultural production volume and diversity
    - Existing market access challenges
    - Smartphone penetration rate (minimum 30%)
    - Presence of potential local champions
    - Proximity to urban markets for initial buyer acquisition
 
-2. **Community Activation Process**:
+2. Community Activation Process:
    - Identification and training of local digital ambassadors
    - Community-wide demonstration events and training sessions
    - Formation of farmer user groups for peer support
    - Establishment of local verification committees
    - Regular feedback gatherings and improvement circles
 
-3. **Expansion Triggers**:
+3. Expansion Triggers:
    - Achieving 40%+ adoption rate in current villages
    - Establishing stable marketplace dynamics with consistent transactions
    - Developing sufficient buyer demand in adjacent market areas
@@ -88,25 +87,25 @@ Ankrishi employs a deliberate, phased scaling approach:
 
 Ankrishi follows a strategic feature rollout sequence:
 
-1. **Foundation Phase** (Months 1-3 in new village):
+1. Foundation Phase (Months 1-3 in new village):
    - User onboarding and basic profile creation
    - Simple marketplace listings and discovery
    - Essential weather information
    - Basic financial record-keeping
 
-2. **Engagement Phase** (Months 4-6):
+2. Engagement Phase (Months 4-6):
    - Verification system activation
    - Expanded marketplace functionality with negotiations
    - Enhanced weather and market price information
    - Peer-to-peer knowledge sharing features
 
-3. **Advancement Phase** (Months 7-12):
+3. Advancement Phase (Months 7-12):
    - Complete financial management tools
    - Advanced marketplace features (pre-listing, requirements)
    - Community collective features
    - Integration with local logistics providers
 
-4. **Maturity Phase** (Year 2+):
+4. Maturity Phase (Year 2+):
    - AI-powered recommendations and forecasting
    - Complete financial health assessment
    - Cross-village marketplace expansion
@@ -116,25 +115,25 @@ Ankrishi follows a strategic feature rollout sequence:
 
 Ankrishi employs a comprehensive impact assessment methodology:
 
-1. **Economic Indicators**:
+1. Economic Indicators:
    - Average farmer income change (target: +40% in Year 1)
    - Price realization compared to traditional channels
    - Transaction volume and frequency
    - Reduction in post-harvest losses
 
-2. **Social Indicators**:
+2. Social Indicators:
    - Digital literacy improvement
    - Community collaboration metrics
    - Knowledge sharing activity
    - User satisfaction and retention rates
 
-3. **Agricultural System Indicators**:
+3. Agricultural System Indicators:
    - Supply chain efficiency improvements
    - Product quality and verification metrics
    - Crop diversification trends
    - Sustainable practice adoption rates
 
-4. **Data Collection Methods**:
+4. Data Collection Methods:
    - Automated platform analytics
    - Quarterly structured user surveys
    - Monthly focus group discussions
@@ -147,19 +146,19 @@ Ankrishi employs a comprehensive impact assessment methodology:
 
 Ankrishi employs a modified agile methodology adapted for rural contexts:
 
-1. **Sprint Structure**:
+1. Sprint Structure:
    - 2-week development sprints
    - Field testing week after every 2 sprints
    - Monthly user feedback incorporation
    - Quarterly major feature deployments
 
-2. **Development Priorities**:
+2. Development Priorities:
    - Stability and reliability over feature richness
    - Offline functionality as core requirement
    - Performance optimization for low-end devices
    - Minimal data usage for cost-sensitive users
 
-3. **Quality Assurance**:
+3. Quality Assurance:
    - Automated testing for core functionality
    - Field testing in actual rural environments
    - Usability testing with varied literacy levels
@@ -169,19 +168,19 @@ Ankrishi employs a modified agile methodology adapted for rural contexts:
 
 Ankrishi implements a responsible data management methodology:
 
-1. **Data Collection Principles**:
+1. Data Collection Principles:
    - Minimal necessary data collection
    - Clear user consent for all data usage
    - Local data storage where possible
    - Transparent data usage policies
 
-2. **Analytics Framework**:
+2. Analytics Framework:
    - User behavior analysis for feature optimization
    - Transaction pattern monitoring for fraud prevention
    - Market trend analysis for price recommendations
    - Usage pattern tracking for performance improvement
 
-3. **Data Security Measures**:
+3. Data Security Measures:
    - Regular security audits
    - Encryption of sensitive information
    - Access controls based on need-to-know
@@ -193,25 +192,25 @@ Ankrishi implements a responsible data management methodology:
 
 Ankrishi builds sustainable partnerships through:
 
-1. **Government Collaboration**:
+1. Government Collaboration:
    - Integration with existing agricultural extension services
    - Alignment with digital agriculture initiatives
    - Participation in regulatory discussions
    - Data sharing for policy improvement
 
-2. **Private Sector Engagement**:
+2. Private Sector Engagement:
    - Strategic partnerships with input suppliers
    - Collaboration with agricultural processors
    - Integration with financial service providers
    - Alliances with logistics and transportation companies
 
-3. **Academic & Research Partnerships**:
+3. Academic & Research Partnerships:
    - Collaboration with agricultural universities
    - Data sharing for agricultural research
    - Student involvement in field research
    - Joint publication of impact studies
 
-4. **NGO & Civil Society Coordination**:
+4. NGO & Civil Society Coordination:
    - Leveraging existing farmer groups and cooperatives
    - Coordination with rural development organizations
    - Knowledge sharing with other agricultural initiatives

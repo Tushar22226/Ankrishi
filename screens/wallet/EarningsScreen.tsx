@@ -22,23 +22,38 @@ const EarningsScreen = () => {
   const navigation = useNavigation();
   const { user, userProfile } = useAuth();
   const { colors } = useTheme();
-  
+
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [heldBalance, setHeldBalance] = useState<number | null>(null);
+  const [availableBalance, setAvailableBalance] = useState<number | null>(null);
+  const [pendingEarnings, setPendingEarnings] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  
+
   // Load wallet data
   const loadWalletData = async () => {
     if (!user) return;
-    
+
     try {
       setLoading(true);
-      
-      // Get wallet balance
+
+      // Get wallet balances
       const balance = await WalletService.getBalance(user.uid);
+      const held = await WalletService.getHeldBalance(user.uid);
+      const available = await WalletService.getAvailableBalance(user.uid);
+
+      // Get pending earnings (for farmers)
+      let pending = 0;
+      if (userProfile?.role === 'farmer') {
+        pending = await WalletService.getPendingEarnings(user.uid);
+      }
+
       setWalletBalance(balance);
-      
+      setHeldBalance(held);
+      setAvailableBalance(available);
+      setPendingEarnings(pending);
+
       // Get transactions
       const transactionsList = await WalletService.getTransactions(user.uid);
       setTransactions(transactionsList);
@@ -50,18 +65,18 @@ const EarningsScreen = () => {
       setRefreshing(false);
     }
   };
-  
+
   // Initial data loading
   useEffect(() => {
     loadWalletData();
   }, [user]);
-  
+
   // Handle refresh
   const handleRefresh = () => {
     setRefreshing(true);
     loadWalletData();
   };
-  
+
   // Format date
   const formatDate = (timestamp: number) => {
     const date = new Date(timestamp);
@@ -71,20 +86,20 @@ const EarningsScreen = () => {
       year: 'numeric',
     });
   };
-  
+
   // Calculate earnings statistics
   const calculateEarnings = () => {
     if (!transactions.length) return { today: 0, thisWeek: 0, thisMonth: 0 };
-    
+
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()).getTime();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-    
+
     let today = 0;
     let thisWeek = 0;
     let thisMonth = 0;
-    
+
     // Only count delivery fee credits
     transactions.forEach(transaction => {
       if (transaction.type === 'credit' && transaction.description.includes('Delivery fee')) {
@@ -99,20 +114,20 @@ const EarningsScreen = () => {
         }
       }
     });
-    
+
     return { today, thisWeek, thisMonth };
   };
-  
+
   const earnings = calculateEarnings();
-  
+
   // Render transaction item
   const renderTransactionItem = ({ item }: { item: Transaction }) => {
     const isCredit = item.type === 'credit';
     const isDeliveryFee = item.description.includes('Delivery fee');
-    
+
     // Only show delivery fee transactions
     if (!isDeliveryFee) return null;
-    
+
     return (
       <Card style={styles.transactionCard}>
         <View style={styles.transactionHeader}>
@@ -130,12 +145,12 @@ const EarningsScreen = () => {
       </Card>
     );
   };
-  
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
@@ -144,50 +159,72 @@ const EarningsScreen = () => {
         <Text style={styles.headerTitle}>Delivery Earnings</Text>
         <View style={{ width: 24 }} />
       </View>
-      
+
       {/* Wallet Balance */}
       <Card style={styles.balanceCard}>
         <View style={styles.balanceHeader}>
           <Ionicons name="wallet-outline" size={24} color={colors.primary} />
           <Text style={styles.balanceTitle}>Wallet Balance</Text>
         </View>
-        
+
         {loading && !refreshing ? (
           <ActivityIndicator size="large" color={colors.primary} />
         ) : (
-          <Text style={styles.balanceAmount}>₹{walletBalance?.toFixed(2) || '0.00'}</Text>
+          <View style={styles.balanceDetails}>
+            <View style={styles.balanceRow}>
+              <Text style={styles.balanceLabel}>Total Balance:</Text>
+              <Text style={styles.balanceAmount}>₹{walletBalance?.toFixed(2) || '0.00'}</Text>
+            </View>
+
+            <View style={styles.balanceRow}>
+              <Text style={styles.balanceLabel}>Held for Orders:</Text>
+              <Text style={[styles.balanceAmount, styles.heldAmount]}>₹{heldBalance?.toFixed(2) || '0.00'}</Text>
+            </View>
+
+            {userProfile?.role === 'farmer' && pendingEarnings && pendingEarnings > 0 && (
+              <View style={styles.balanceRow}>
+                <Text style={styles.balanceLabel}>Pending Earnings:</Text>
+                <Text style={[styles.balanceAmount, {color: '#9C27B0'}]}>₹{pendingEarnings?.toFixed(2) || '0.00'}</Text>
+              </View>
+            )}
+
+            <View style={[styles.balanceRow, styles.availableRow]}>
+              <Text style={[styles.balanceLabel, styles.availableLabel]}>Available Balance:</Text>
+              <Text style={[styles.balanceAmount, styles.availableAmount]}>₹{availableBalance?.toFixed(2) || '0.00'}</Text>
+            </View>
+          </View>
         )}
       </Card>
-      
+
       {/* Earnings Summary */}
       <Card style={styles.earningsCard}>
         <View style={styles.earningsHeader}>
           <Ionicons name="stats-chart" size={24} color={colors.primary} />
           <Text style={styles.earningsTitle}>Earnings Summary</Text>
         </View>
-        
+
         <View style={styles.earningsGrid}>
           <View style={styles.earningsItem}>
             <Text style={styles.earningsLabel}>Today</Text>
             <Text style={styles.earningsValue}>₹{earnings.today.toFixed(2)}</Text>
           </View>
-          
+
           <View style={styles.earningsItem}>
             <Text style={styles.earningsLabel}>This Week</Text>
             <Text style={styles.earningsValue}>₹{earnings.thisWeek.toFixed(2)}</Text>
           </View>
-          
+
           <View style={styles.earningsItem}>
             <Text style={styles.earningsLabel}>This Month</Text>
             <Text style={styles.earningsValue}>₹{earnings.thisMonth.toFixed(2)}</Text>
           </View>
         </View>
       </Card>
-      
+
       {/* Transactions List */}
       <View style={styles.transactionsContainer}>
         <Text style={styles.sectionTitle}>Recent Delivery Earnings</Text>
-        
+
         <FlatList
           data={transactions}
           renderItem={renderTransactionItem}
@@ -255,12 +292,42 @@ const styles = StyleSheet.create({
     color: '#2E3A59',
     marginLeft: spacing.sm,
   },
+  balanceDetails: {
+    marginTop: spacing.sm,
+  },
+  balanceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  availableRow: {
+    borderTopWidth: 1,
+    borderTopColor: '#EEEEEE',
+    paddingTop: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  balanceLabel: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.medium,
+    color: '#6B7280',
+  },
+  availableLabel: {
+    fontFamily: typography.fontFamily.bold,
+    color: '#2E3A59',
+  },
   balanceAmount: {
-    fontSize: typography.fontSize.xxl,
+    fontSize: typography.fontSize.lg,
     fontFamily: typography.fontFamily.bold,
     color: '#4CAF50',
-    textAlign: 'center',
-    marginVertical: spacing.md,
+  },
+  heldAmount: {
+    color: '#F59E0B', // Amber color for held funds
+  },
+  availableAmount: {
+    fontSize: typography.fontSize.xl,
+    color: '#4CAF50',
   },
   earningsCard: {
     marginHorizontal: spacing.md,

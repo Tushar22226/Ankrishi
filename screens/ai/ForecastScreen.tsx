@@ -13,6 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { colors, typography, spacing, borderRadius } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import ForecastService from '../../services/ForecastService';
+import AIMarketForecastService from '../../services/AIMarketForecastService';
 import Card from '../../components/Card';
 import LoadingQuote from '../../components/LoadingQuote';
 import { getPlatformTopSpacing } from '../../utils/platformUtils';
@@ -68,14 +69,43 @@ const ForecastScreen = () => {
         console.log('Error getting recommendations:', recError);
       }
 
-      // Get market price forecasts for common crops
-      const crops = ['tomato', 'potato', 'wheat', 'rice', 'soybean'];
+      // Get market price forecasts for a wider range of crops
+      const crops = [
+        // Cereals
+        'rice', 'wheat', 'maize', 'bajra', 'jowar',
+        // Vegetables
+        'tomato', 'potato', 'onion', 'cauliflower', 'brinjal',
+        // Pulses
+        'moong', 'masoor', 'chana', 'toor', 'urad',
+        // Cash crops
+        'soybean', 'cotton', 'sugarcane',
+        // Fruits
+        'mango', 'banana'
+      ];
       const marketData = [];
 
-      for (const crop of crops) {
-        const forecast = await ForecastService.getMarketPriceForecast(crop, userProfile.location);
-        if (forecast) {
-          marketData.push(forecast);
+      // Get forecasts from AIMarketForecastService directly for better performance
+      try {
+        const allForecasts = await AIMarketForecastService.getMarketPriceForecasts(userProfile.location);
+
+        // Filter to include only the crops we're interested in
+        const filteredForecasts = allForecasts.filter(forecast =>
+          crops.includes(forecast.productId.toLowerCase())
+        );
+
+        // Sort by price change percentage (highest first) to show most significant changes
+        marketData.push(...filteredForecasts.sort((a, b) =>
+          Math.abs(b.priceChangePercentage) - Math.abs(a.priceChangePercentage)
+        ));
+      } catch (error) {
+        console.error('Error getting market forecasts:', error);
+
+        // Fallback to individual forecasts if bulk method fails
+        for (const crop of crops.slice(0, 5)) { // Limit to 5 crops in fallback mode
+          const forecast = await ForecastService.getMarketPriceForecast(crop, userProfile.location);
+          if (forecast) {
+            marketData.push(forecast);
+          }
         }
       }
 
@@ -207,21 +237,23 @@ const ForecastScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* AI Recommendations */}
-      <Card style={styles.recommendationsCard}>
-        <Text style={styles.sectionTitle}>AI Recommendations</Text>
+      {/* AI Recommendations - Only show when weather tab is active */}
+      {activeTab === 'weather' && (
+        <Card style={styles.recommendationsCard}>
+          <Text style={styles.sectionTitle}>AI Recommendations</Text>
 
-        {recommendations.length > 0 ? (
-          recommendations.map((recommendation, index) => (
-            <View key={`rec-${index}`} style={styles.recommendationItem}>
-              <Ionicons name="bulb-outline" size={24} color={colors.secondary} />
-              <Text style={styles.recommendationText}>{recommendation}</Text>
-            </View>
-          ))
-        ) : (
-          <Text style={styles.noDataText}>No recommendations available</Text>
-        )}
-      </Card>
+          {recommendations.length > 0 ? (
+            recommendations.map((recommendation, index) => (
+              <View key={`rec-${index}`} style={styles.recommendationItem}>
+                <Ionicons name="bulb-outline" size={24} color={colors.secondary} />
+                <Text style={styles.recommendationText}>{recommendation}</Text>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.noDataText}>No recommendations available</Text>
+          )}
+        </Card>
+      )}
 
       {/* Weather Forecast Section */}
       {activeTab === 'weather' && weatherForecast.length > 0 && (
@@ -348,10 +380,10 @@ const ForecastScreen = () => {
                     <Text style={styles.marketCropName}>{forecast.productName}</Text>
                     <View style={[
                       styles.priceTrend,
-                      forecast.priceChange > 0 ? styles.priceTrendUp : styles.priceTrendDown
+                      forecast.priceChangePercentage > 0 ? styles.priceTrendUp : styles.priceTrendDown
                     ]}>
                       <Ionicons
-                        name={forecast.priceChange > 0 ? 'arrow-up' : 'arrow-down'}
+                        name={forecast.priceChangePercentage > 0 ? 'arrow-up' : 'arrow-down'}
                         size={16}
                         color={colors.white}
                       />
@@ -379,7 +411,7 @@ const ForecastScreen = () => {
                       <Text style={styles.priceLabel}>Forecasted Price</Text>
                       <Text style={[
                         styles.priceValue,
-                        forecast.priceChange > 0 ? styles.priceUp : styles.priceDown
+                        forecast.priceChangePercentage > 0 ? styles.priceUp : styles.priceDown
                       ]}>
                         ₹{forecast.forecastedPrice}/kg
                       </Text>
@@ -388,13 +420,13 @@ const ForecastScreen = () => {
 
                   <View style={styles.confidenceContainer}>
                     <Text style={styles.confidenceLabel}>
-                      Confidence: {(forecast.confidence * 100).toFixed(0)}%
+                      Confidence: {(forecast.confidenceLevel * 100).toFixed(0)}%
                     </Text>
                     <View style={styles.confidenceBar}>
                       <View
                         style={[
                           styles.confidenceFill,
-                          { width: `${forecast.confidence * 100}%` }
+                          { width: `${forecast.confidenceLevel * 100}%` }
                         ]}
                       />
                     </View>

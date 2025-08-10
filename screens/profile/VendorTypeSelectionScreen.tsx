@@ -1,17 +1,16 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, typography, spacing, borderRadius } from '../../theme';
+import { colors, spacing } from '../../theme';
 import Button from '../../components/Button';
-import Card from '../../components/Card';
-import { getPlatformTopSpacing } from '../../utils/platformUtils';
 
 const VendorTypeSelectionScreen = () => {
   const navigation = useNavigation();
@@ -20,11 +19,17 @@ const VendorTypeSelectionScreen = () => {
   const handleContinue = () => {
     if (!selectedType) return;
 
-    if (selectedType === 'individual') {
-      navigation.navigate('IndividualVendorVerificationForm');
-    } else {
-      navigation.navigate('CompanyVerificationForm');
-    }
+    // Temporary implementation - show coming soon message
+    Alert.alert(
+      'Coming Soon',
+      `${selectedType === 'individual' ? 'Individual vendor' : 'Company'} verification forms are currently being developed. Please check back soon!`,
+      [
+        {
+          text: 'OK',
+          onPress: () => navigation.navigate('VerifyProfile' as never)
+        }
+      ]
+    );
   };
 
   return (
@@ -115,10 +120,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA',
+    marginTop:20,
   },
   contentContainer: {
     padding: 18,
-    paddingTop: getPlatformTopSpacing(),
+    paddingTop: spacing.lg,
   },
   header: {
     flexDirection: 'row',

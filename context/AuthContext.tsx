@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import { auth, database } from '../firebase/config';
 
 // Define user roles
-export type UserRole = 'farmer' | 'vendor' | 'buyer' | 'consultant';
+export type UserRole = 'farmer' | 'vendor' | 'buyer' | 'consultant' | 'delivery_partner';
 
 // Define user profile interface
 export interface UserProfile {
@@ -103,6 +103,29 @@ interface AuthContextType {
 // Create the auth context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper function to create initial profile
+const createInitialProfile = (user: User): UserProfile => {
+  return {
+    uid: user.uid,
+    email: user.email || undefined,
+    phoneNumber: user.phoneNumber || undefined,
+    role: 'farmer', // Default role
+    createdAt: Date.now(),
+    profileComplete: false, // User needs to complete profile setup
+    reputation: {
+      rating: 0,
+      totalRatings: 0,
+      successfulOrders: 0,
+      verifiedStatus: false,
+      badges: [],
+      reviews: []
+    },
+    verification: {
+      status: 'unverified'
+    }
+  };
+};
+
 // Auth provider component
 export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -151,34 +174,31 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
           if (snapshot.exists()) {
             const profile = snapshot.val() as UserProfile;
             console.log('User profile loaded:', profile);
-            console.log('Profile complete status:', profile.profileComplete);
-
-            setUserProfile(profile);
+            // Add null check before accessing profileComplete
+            if (profile) {
+              console.log('Profile complete status:', profile.profileComplete);
+              setUserProfile(profile);
+            } else {
+              console.log('Profile exists but data is null or undefined');
+              // Create a basic profile if data is null
+              const initialProfile: UserProfile = createInitialProfile(currentUser);
+              await userRef.set(initialProfile);
+              setUserProfile(initialProfile);
+            }
           } else {
             console.log('No user profile found, creating initial profile');
-            // Create a basic profile
-            const initialProfile: UserProfile = {
-              uid: currentUser.uid,
-              email: currentUser.email || undefined,
-              phoneNumber: currentUser.phoneNumber || undefined,
-              role: 'farmer', // Default role
-              createdAt: Date.now(),
-              profileComplete: false, // User needs to complete profile setup
-              reputation: {
-                rating: 0,
-                totalRatings: 0,
-                successfulOrders: 0,
-                verifiedStatus: false,
-                badges: [],
-                reviews: []
-              },
-              verification: {
-                status: 'unverified'
-              }
-            };
-
-            await userRef.set(initialProfile);
-            setUserProfile(initialProfile);
+            // Create a basic profile using the helper function
+            const initialProfile = createInitialProfile(currentUser);
+            
+            try {
+              await userRef.set(initialProfile);
+              console.log('Successfully created and saved initial profile');
+              setUserProfile(initialProfile);
+            } catch (error) {
+              console.error('Error creating initial profile:', error);
+              // Still set the profile in memory even if saving to database failed
+              setUserProfile(initialProfile);
+            }
           }
         } catch (error) {
           console.error('Error fetching user profile:', error);
@@ -204,30 +224,35 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const signUpWithEmail = async (email: string, password: string) => {
     try {
       const userCredential = await auth().createUserWithEmailAndPassword(email, password);
-      // Create initial user profile
-      const initialProfile: UserProfile = {
+      
+      if (!userCredential || !userCredential.user) {
+        throw new Error('User creation failed - no user credential returned');
+      }
+      
+      console.log('User created successfully, creating profile for UID:', userCredential.user.uid);
+      
+      // Create initial user profile using the helper function with User object
+      const user: User = {
         uid: userCredential.user.uid,
-        email,
-        role: 'farmer', // Default role
-        createdAt: Date.now(),
-        profileComplete: false, // Profile is not complete until all required fields are filled
-        reputation: {
-          rating: 0,
-          totalRatings: 0,
-          successfulOrders: 0,
-          verifiedStatus: false,
-          badges: [],
-          reviews: []
-        },
-        verification: {
-          status: 'unverified'
-        }
+        email: email,
+        phoneNumber: null,
+        displayName: null
       };
-
-      await database().ref(`users/${userCredential.user.uid}`).set(initialProfile);
-      setUserProfile(initialProfile);
-
-      console.log('Created initial profile with profileComplete=false');
+      
+      const initialProfile = createInitialProfile(user);
+      
+      console.log('Initial profile created, now saving to database...');
+      
+      try {
+        await database().ref(`users/${userCredential.user.uid}`).set(initialProfile);
+        console.log('Initial profile saved to database successfully');
+        setUserProfile(initialProfile);
+        console.log('Created initial profile with profileComplete=false');
+      } catch (dbError) {
+        console.error('Error saving profile to database:', dbError);
+        // Still set the profile in memory even if saving to database failed
+        setUserProfile(initialProfile);
+      }
     } catch (error) {
       console.error('Error signing up:', error);
       throw error;
@@ -275,31 +300,56 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       const snapshot = await userRef.once('value');
 
       if (snapshot.exists()) {
-        const currentProfile = snapshot.val() as UserProfile;
+        let currentProfile = snapshot.val() as UserProfile;
         console.log('Current profile:', currentProfile);
-
+        
+        // If currentProfile is null/undefined despite snapshot existing
+        if (!currentProfile) {
+          console.log('Current profile is null or undefined, creating a new one');
+          currentProfile = createInitialProfile(user);
+        }
+  
         // Create updated profile by merging current profile with new data
-        const updatedProfile = { ...currentProfile, ...profile };
+        // Ensure all required fields exist
+        const updatedProfile = { 
+          ...currentProfile, 
+          ...profile,
+          // Ensure these critical fields are always present
+          uid: user.uid,
+          createdAt: currentProfile.createdAt || Date.now(),
+          profileComplete: profile.profileComplete !== undefined ? 
+            profile.profileComplete : (currentProfile.profileComplete || false)
+        };
+        
         console.log('Updated profile to be saved:', updatedProfile);
-
+  
         // Save to database
         await userRef.set(updatedProfile);
         console.log('Profile saved to database successfully');
-
+  
         // Update local state
         setUserProfile(updatedProfile);
         console.log('Local userProfile state updated');
-
+  
         // Force a refresh of the profile from the database to ensure we have the latest data
         const refreshSnapshot = await userRef.once('value');
         if (refreshSnapshot.exists()) {
           const refreshedProfile = refreshSnapshot.val() as UserProfile;
-          console.log('Refreshed profile from database:', refreshedProfile);
-          setUserProfile(refreshedProfile);
+          if (refreshedProfile) {
+            console.log('Refreshed profile from database:', refreshedProfile);
+            setUserProfile(refreshedProfile);
+          }
         }
       } else {
-        console.error('User profile does not exist in database');
-        throw new Error('User profile not found');
+        console.log('User profile does not exist in database, creating a new one');
+        const newProfile = { 
+          ...createInitialProfile(user), 
+          ...profile,
+          uid: user.uid 
+        };
+        await userRef.set(newProfile);
+        setUserProfile(newProfile);
+        console.log('Created and saved new profile since none existed');
       }
     } catch (error) {
       console.error('Error updating profile:', error);

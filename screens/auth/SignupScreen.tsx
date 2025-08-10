@@ -13,14 +13,13 @@ import {
   Dimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Ionicons, FontAwesome } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius, shadows } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import Input from '../../components/Input';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import GradientBackground from '../../components/GradientBackground';
-import SocialButton from '../../components/SocialButton';
 import { getPlatformTopSpacing } from '../../utils/platformUtils';
 
 const SignupScreen = () => {
@@ -174,7 +173,7 @@ const SignupScreen = () => {
   // No longer needed as we use the tab buttons directly
 
   return (
-    <GradientBackground colors={[colors.primaryLight, colors.primary, colors.primaryDark]}>
+    <GradientBackground colors={[colors.white, colors.white]}>
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -193,13 +192,15 @@ const SignupScreen = () => {
               }
             ]}
           >
-            <Image
-              source={require('../../assets/icon.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
+            <View style={styles.logoContainer}>
+              <Image
+                source={require('../../assets/icon.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            </View>
             <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Join FarmConnect today</Text>
+            <Text style={styles.subtitle}>Join ankrishi today</Text>
           </Animated.View>
 
           <Animated.View
@@ -209,7 +210,8 @@ const SignupScreen = () => {
               width: '100%'
             }}
           >
-            <Card style={styles.card} elevation="high">
+            <Card style={styles.card} elevation="high" borderRadius={borderRadius.lg}>
+              <Text style={styles.cardTitle}>Sign Up</Text>
               <View style={styles.methodToggle}>
                 <TouchableOpacity
                   style={[
@@ -390,29 +392,7 @@ const SignupScreen = () => {
                 </View>
               )}
 
-              <View style={styles.dividerContainer}>
-                <View style={styles.divider} />
-                <Text style={styles.dividerText}>OR</Text>
-                <View style={styles.divider} />
-              </View>
 
-              <View style={styles.socialButtonsContainer}>
-                <SocialButton
-                  icon={<FontAwesome name="google" size={20} color="#DB4437" />}
-                  style={styles.socialButton}
-                  onPress={() => Alert.alert('Info', 'Google signup not implemented yet')}
-                />
-                <SocialButton
-                  icon={<FontAwesome name="facebook" size={20} color="#4267B2" />}
-                  style={styles.socialButton}
-                  onPress={() => Alert.alert('Info', 'Facebook signup not implemented yet')}
-                />
-                <SocialButton
-                  icon={<FontAwesome name="apple" size={20} color="#000000" />}
-                  style={styles.socialButton}
-                  onPress={() => Alert.alert('Info', 'Apple signup not implemented yet')}
-                />
-              </View>
             </Card>
           </Animated.View>
 
@@ -444,51 +424,63 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
-    paddingHorizontal: spacing.lg,
-    ...getPlatformTopSpacing('paddingTop', spacing.xl * 1.5, spacing.xl * 2.5),
-    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.md,
+    ...getPlatformTopSpacing('paddingTop', spacing.xl, spacing.xl * 1.5),
+    paddingBottom: spacing.lg,
   },
   header: {
     alignItems: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
   },
-  logo: {
+  logoContainer: {
     width: 100,
     height: 100,
-    marginBottom: spacing.md,
     borderRadius: 50,
-    ...shadows.md,
+    backgroundColor: colors.veryLightGray,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+    ...shadows.sm,
+  },
+  logo: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   title: {
     fontSize: typography.fontSize.xl,
     fontFamily: typography.fontFamily.bold,
-    color: colors.white,
+    color: colors.textPrimary,
     marginBottom: spacing.xs,
     textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
   },
   subtitle: {
     fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily.regular,
-    color: colors.white,
+    color: colors.textSecondary,
     textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
   },
   card: {
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
     borderRadius: borderRadius.lg,
-    paddingVertical: spacing.sm, // Reduced vertical padding
-    paddingHorizontal: 0, // No horizontal padding
+    paddingVertical: spacing.md,
+    paddingHorizontal: 0,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.veryLightGray,
+  },
+  cardTitle: {
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
   },
   methodToggle: {
     flexDirection: 'row',
-    marginBottom: spacing.lg,
-    backgroundColor: colors.lightGray,
-    borderRadius: borderRadius.lg,
+    marginBottom: spacing.md,
+    backgroundColor: colors.veryLightGray,
+    borderRadius: borderRadius.md,
     padding: spacing.xs,
     marginHorizontal: spacing.md,
   },
@@ -498,14 +490,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.sm,
+    gap: spacing.xs,
   },
   activeMethodButton: {
     backgroundColor: colors.primary,
   },
   methodButtonText: {
     marginLeft: spacing.xs,
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily.medium,
     color: colors.mediumGray,
   },
@@ -513,20 +506,21 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   formContainer: {
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.sm,
-    gap: spacing.xs, // Reduced gap between form elements
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    gap: spacing.md,
   },
   termsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.md,
+    marginTop: spacing.xs,
   },
   checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 1,
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
     borderColor: colors.mediumGray,
     marginRight: spacing.xs,
     alignItems: 'center',
@@ -555,31 +549,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.medium,
     color: colors.primary,
   },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.lightGray,
-  },
-  dividerText: {
-    marginHorizontal: spacing.sm,
-    fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.medium,
-    color: colors.textSecondary,
-  },
-  socialButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: spacing.sm,
-  },
-  socialButton: {
-    marginHorizontal: spacing.xs,
-  },
+
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -589,19 +559,13 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily.regular,
-    color: colors.white,
+    color: colors.textSecondary,
     marginRight: spacing.xs,
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
   },
   loginText: {
     fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily.bold,
-    color: colors.white,
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
+    color: colors.primary,
   },
   tabContainer: {
     flexDirection: 'row',

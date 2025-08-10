@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,77 +6,87 @@ import {
   FlatList,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { colors, typography, spacing, borderRadius } from '../../theme';
+import { colors, typography } from '../../theme';
 import Card from '../../components/Card';
-
-// Mock tasks data
-const mockTasks = [
-  {
-    id: 'task1',
-    title: 'Apply fertilizer to wheat field',
-    description: 'Apply 50kg of urea to the wheat field',
-    dueDate: new Date(Date.now() + 86400000 * 2), // 2 days from now
-    priority: 'high',
-    status: 'pending',
-    cropId: 'crop1',
-    cropName: 'Wheat',
-  },
-  {
-    id: 'task2',
-    title: 'Irrigate tomato plants',
-    description: 'Water tomato plants for 1 hour',
-    dueDate: new Date(Date.now() + 86400000 * 1), // 1 day from now
-    priority: 'medium',
-    status: 'pending',
-    cropId: 'crop2',
-    cropName: 'Tomatoes',
-  },
-  {
-    id: 'task3',
-    title: 'Spray pesticide on rice field',
-    description: 'Spray neem oil solution on rice plants',
-    dueDate: new Date(Date.now() + 86400000 * 3), // 3 days from now
-    priority: 'medium',
-    status: 'pending',
-    cropId: 'crop3',
-    cropName: 'Rice',
-  },
-  {
-    id: 'task4',
-    title: 'Harvest ready tomatoes',
-    description: 'Harvest ripe tomatoes from the field',
-    dueDate: new Date(Date.now()), // Today
-    priority: 'high',
-    status: 'pending',
-    cropId: 'crop2',
-    cropName: 'Tomatoes',
-  },
-  {
-    id: 'task5',
-    title: 'Check wheat for pests',
-    description: 'Inspect wheat field for any signs of pests or disease',
-    dueDate: new Date(Date.now() - 86400000 * 1), // 1 day ago
-    priority: 'low',
-    status: 'completed',
-    cropId: 'crop1',
-    cropName: 'Wheat',
-  },
-];
+import { useAuth } from '../../context/AuthContext';
+import FarmService from '../../services/FarmService';
+import { FarmTask, TaskPriority } from '../../models/Farm';
 
 const TaskManagementScreen = () => {
   const navigation = useNavigation();
-  const [tasks, setTasks] = useState(mockTasks);
-  const [filter, setFilter] = useState('all'); // 'all', 'pending', 'completed'
-  
+  const { userProfile } = useAuth();
+
+  // State
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [tasks, setTasks] = useState<FarmTask[]>([]);
+  const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
+
+  // Load tasks on component mount
+  useEffect(() => {
+    if (userProfile?.uid) {
+      loadTasks();
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  // Load tasks from Firebase
+  const loadTasks = async () => {
+    if (!userProfile?.uid) return;
+
+    try {
+      setLoading(true);
+
+      // Get tasks from Firebase
+      const taskData = await FarmService.getTasks(userProfile.uid);
+      setTasks(taskData);
+    } catch (error) {
+      console.error('Error loading tasks:', error);
+      Alert.alert('Error', 'Failed to load tasks. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // Handle refresh
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadTasks();
+  };
+
+  // Filter tasks
   const filteredTasks = tasks.filter(task => {
     if (filter === 'all') return true;
     return task.status === filter;
   });
-  
-  const getPriorityColor = (priority) => {
+
+  // Sort tasks by due date and priority
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
+    // First sort by status (pending first)
+    if (a.status !== b.status) {
+      return a.status === 'pending' ? -1 : 1;
+    }
+
+    // Then sort by due date (earlier first)
+    if (a.dueDate !== b.dueDate) {
+      return a.dueDate - b.dueDate;
+    }
+
+    // Then sort by priority (high first)
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+    return priorityOrder[a.priority] - priorityOrder[b.priority];
+  });
+
+  // Get priority color
+  const getPriorityColor = (priority: TaskPriority) => {
     switch (priority) {
       case 'high':
         return colors.error;
@@ -88,32 +98,57 @@ const TaskManagementScreen = () => {
         return colors.textSecondary;
     }
   };
-  
-  const formatDate = (date) => {
-    return date.toLocaleDateString('en-US', {
+
+  // Format date
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
   };
-  
-  const isOverdue = (date) => {
-    return new Date(date) < new Date() && date.getDate() !== new Date().getDate();
+
+  // Check if task is overdue
+  const isOverdue = (dueDate: number) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(dueDate);
+    due.setHours(0, 0, 0, 0);
+    return due < today;
   };
-  
-  const toggleTaskStatus = (taskId) => {
-    setTasks(tasks.map(task => {
-      if (task.id === taskId) {
-        return {
-          ...task,
-          status: task.status === 'completed' ? 'pending' : 'completed',
-        };
-      }
-      return task;
-    }));
+
+  // Toggle task status
+  const toggleTaskStatus = async (taskId: string) => {
+    if (!userProfile?.uid) return;
+
+    try {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      const newStatus = task.status === 'completed' ? 'pending' : 'completed';
+
+      // Update task status in Firebase
+      await FarmService.updateTaskStatus(userProfile.uid, taskId, newStatus);
+
+      // Update local state
+      setTasks(tasks.map(task => {
+        if (task.id === taskId) {
+          return {
+            ...task,
+            status: newStatus,
+            completedAt: newStatus === 'completed' ? Date.now() : undefined,
+          };
+        }
+        return task;
+      }));
+    } catch (error) {
+      console.error('Error updating task status:', error);
+      Alert.alert('Error', 'Failed to update task status. Please try again.');
+    }
   };
-  
-  const renderTaskItem = ({ item }) => (
+
+  // Render task item
+  const renderTaskItem = ({ item }: { item: FarmTask }) => (
     <Card style={styles.taskCard}>
       <View style={styles.taskHeader}>
         <View style={styles.taskTitleContainer}>
@@ -127,7 +162,7 @@ const TaskManagementScreen = () => {
               color={colors.primary}
             />
           </TouchableOpacity>
-          
+
           <View>
             <Text
               style={[
@@ -137,22 +172,26 @@ const TaskManagementScreen = () => {
             >
               {item.title}
             </Text>
-            
-            <Text style={styles.taskCrop}>
-              {item.cropName}
-            </Text>
+
+            {item.cropName && (
+              <Text style={styles.taskCrop}>
+                {item.cropName}
+              </Text>
+            )}
           </View>
         </View>
-        
+
         <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(item.priority) }]}>
           <Text style={styles.priorityText}>
             {item.priority.charAt(0).toUpperCase() + item.priority.slice(1)}
           </Text>
         </View>
       </View>
-      
-      <Text style={styles.taskDescription}>{item.description}</Text>
-      
+
+      {item.description && (
+        <Text style={styles.taskDescription}>{item.description}</Text>
+      )}
+
       <View style={styles.taskFooter}>
         <View style={styles.dateContainer}>
           <Ionicons name="calendar" size={16} color={colors.textSecondary} />
@@ -166,7 +205,7 @@ const TaskManagementScreen = () => {
             {isOverdue(item.dueDate) && item.status !== 'completed' ? ' (Overdue)' : ''}
           </Text>
         </View>
-        
+
         <TouchableOpacity
           style={styles.editButton}
           onPress={() => {
@@ -179,7 +218,35 @@ const TaskManagementScreen = () => {
       </View>
     </Card>
   );
-  
+
+  // Render empty state
+  const renderEmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="list-outline" size={64} color={colors.lightGray} />
+      <Text style={styles.emptyTitle}>No Tasks Found</Text>
+      <Text style={styles.emptyText}>
+        {filter === 'all' ? 'You have no tasks yet. Add your first task to get started.' :
+         filter === 'pending' ? 'You have no pending tasks. Great job!' :
+         'You have no completed tasks yet.'}
+      </Text>
+      <TouchableOpacity
+        style={styles.emptyButton}
+        onPress={() => navigation.navigate('AddTask')}
+      >
+        <Text style={styles.emptyButtonText}>Add New Task</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // Render loading state
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading tasks...</Text>
+      </View>
+    );
+  }
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -191,7 +258,7 @@ const TaskManagementScreen = () => {
         </TouchableOpacity>
         <Text style={styles.title}>Task Management</Text>
       </View>
-      
+
       <View style={styles.filterContainer}>
         <TouchableOpacity
           style={[
@@ -209,7 +276,7 @@ const TaskManagementScreen = () => {
             All
           </Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[
             styles.filterButton,
@@ -226,7 +293,7 @@ const TaskManagementScreen = () => {
             Pending
           </Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[
             styles.filterButton,
@@ -244,15 +311,23 @@ const TaskManagementScreen = () => {
           </Text>
         </TouchableOpacity>
       </View>
-      
+
       <FlatList
-        data={filteredTasks}
+        data={sortedTasks}
         renderItem={renderTaskItem}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.tasksList}
-        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.tasksList, sortedTasks.length === 0 && styles.emptyList]}
+        ListEmptyComponent={renderEmptyState}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
       />
-      
+
       <TouchableOpacity
         style={styles.addButton}
         onPress={() => navigation.navigate('AddTask')}
@@ -268,59 +343,109 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.medium,
-    paddingTop: spacing.large,
-    paddingBottom: spacing.medium,
+    paddingHorizontal: 16,
+    marginTop: Platform.OS === 'android' ? 32 : 48,
+    marginBottom: 16,
     backgroundColor: colors.white,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    height: 56,
   },
   backButton: {
-    marginRight: spacing.medium,
+    marginRight: 16,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
-    fontSize: typography.fontSizeLarge,
+    fontSize: 20,
     fontWeight: 'bold',
     color: colors.textPrimary,
   },
   filterContainer: {
     flexDirection: 'row',
-    padding: spacing.medium,
+    padding: 16,
     backgroundColor: colors.white,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   filterButton: {
-    paddingVertical: spacing.small,
-    paddingHorizontal: spacing.medium,
-    borderRadius: borderRadius.medium,
-    marginRight: spacing.small,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginRight: 8,
   },
   activeFilterButton: {
     backgroundColor: colors.primary,
   },
   filterText: {
-    fontSize: typography.fontSizeRegular,
+    fontSize: 14,
     color: colors.textPrimary,
   },
   activeFilterText: {
     color: colors.white,
   },
   tasksList: {
-    padding: spacing.medium,
+    padding: 16,
     paddingBottom: 100, // Extra padding for the floating button
   },
+  emptyList: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  emptyButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  emptyButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '500',
+  },
   taskCard: {
-    marginBottom: spacing.medium,
+    marginBottom: 16,
   },
   taskHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: spacing.small,
+    marginBottom: 8,
   },
   taskTitleContainer: {
     flexDirection: 'row',
@@ -328,38 +453,40 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   checkbox: {
-    marginRight: spacing.small,
+    marginRight: 8,
     paddingTop: 2,
   },
   taskTitle: {
-    fontSize: typography.fontSizeMedium,
+    fontSize: 16,
     fontWeight: 'bold',
     color: colors.textPrimary,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   completedTaskTitle: {
     textDecorationLine: 'line-through',
     color: colors.textSecondary,
   },
   taskCrop: {
-    fontSize: typography.fontSizeSmall,
+    fontSize: 14,
     color: colors.textSecondary,
   },
   priorityBadge: {
-    paddingHorizontal: spacing.small,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 12,
-    marginLeft: spacing.small,
+    marginLeft: 8,
   },
   priorityText: {
     color: colors.white,
-    fontSize: typography.fontSizeSmall,
+    fontSize: 12,
+    fontWeight: '500',
   },
   taskDescription: {
-    fontSize: typography.fontSizeRegular,
+    fontSize: 14,
     color: colors.textPrimary,
-    marginBottom: spacing.medium,
+    marginBottom: 16,
     marginLeft: 32, // Align with the title after checkbox
+    lineHeight: 20,
   },
   taskFooter: {
     flexDirection: 'row',
@@ -372,20 +499,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dateText: {
-    fontSize: typography.fontSizeSmall,
+    fontSize: 14,
     color: colors.textSecondary,
-    marginLeft: 4,
+    marginLeft: 8,
   },
   overdueText: {
     color: colors.error,
+    fontWeight: '500',
   },
   editButton: {
-    padding: spacing.small,
+    padding: 8,
   },
   addButton: {
     position: 'absolute',
-    right: spacing.large,
-    bottom: spacing.large,
+    right: 16,
+    bottom: 16,
     width: 56,
     height: 56,
     borderRadius: 28,

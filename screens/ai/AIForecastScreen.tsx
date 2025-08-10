@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   Platform,
+  TextInput,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -33,10 +34,31 @@ const AIForecastScreen = () => {
   const [marketForecasts, setMarketForecasts] = useState<MarketPriceForecast[]>([]);
   const [selectedTab, setSelectedTab] = useState<'crops' | 'market'>('crops');
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadData();
   }, []);
+
+  // Filter crop recommendations based on search query
+  const filteredCropRecommendations = useMemo(() => {
+    if (!searchQuery.trim()) return cropRecommendations;
+
+    const query = searchQuery.toLowerCase().trim();
+    return cropRecommendations.filter(crop =>
+      crop.cropName.toLowerCase().includes(query)
+    );
+  }, [cropRecommendations, searchQuery]);
+
+  // Filter market forecasts based on search query
+  const filteredMarketForecasts = useMemo(() => {
+    if (!searchQuery.trim()) return marketForecasts;
+
+    const query = searchQuery.toLowerCase().trim();
+    return marketForecasts.filter(forecast =>
+      forecast.productName.toLowerCase().includes(query)
+    );
+  }, [marketForecasts, searchQuery]);
 
   const loadData = async () => {
     try {
@@ -86,9 +108,18 @@ const AIForecastScreen = () => {
       );
     }
 
+    if (filteredCropRecommendations.length === 0 && searchQuery.trim() !== '') {
+      return (
+        <View style={styles.emptyState}>
+          <Ionicons name="search-outline" size={48} color={colors.textSecondary} />
+          <Text style={styles.emptyStateText}>No crops found matching "{searchQuery}"</Text>
+        </View>
+      );
+    }
+
     return (
       <View>
-        {cropRecommendations.map((crop, index) => (
+        {filteredCropRecommendations.map((crop, index) => (
           <View key={index} style={styles.cropCard}>
             <View style={styles.cropHeader}>
               <Text style={styles.cropName}>{crop.cropName}</Text>
@@ -129,6 +160,13 @@ const AIForecastScreen = () => {
                 <Ionicons name="cash-outline" size={18} color={colors.primary} />
                 <Text style={styles.detailText}>
                   Expected Price: ₹{crop.expectedPrice.min}-{crop.expectedPrice.max} {crop.expectedPrice.currency}
+                </Text>
+              </View>
+
+              <View style={styles.detailItem}>
+                <Ionicons name="pricetag-outline" size={18} color={colors.success} />
+                <Text style={[styles.detailText, {color: colors.success, fontFamily: typography.fontFamily.semiBold}]}>
+                  Recommended Selling Price: ₹{Math.round((crop.expectedPrice.min + crop.expectedPrice.max) / 2)} {crop.expectedPrice.currency}
                 </Text>
               </View>
 
@@ -197,9 +235,18 @@ const AIForecastScreen = () => {
       );
     }
 
+    if (filteredMarketForecasts.length === 0 && searchQuery.trim() !== '') {
+      return (
+        <View style={styles.emptyState}>
+          <Ionicons name="search-outline" size={48} color={colors.textSecondary} />
+          <Text style={styles.emptyStateText}>No products found matching "{searchQuery}"</Text>
+        </View>
+      );
+    }
+
     return (
       <View>
-        {marketForecasts.map((forecast, index) => {
+        {filteredMarketForecasts.map((forecast, index) => {
           // Create chart data
           const chartData = {
             labels: ['Current', 'Forecast'],
@@ -313,6 +360,20 @@ const AIForecastScreen = () => {
               <View style={styles.recommendationContainer}>
                 <Text style={styles.recommendationTitle}>AI Recommendation:</Text>
                 <Text style={styles.recommendationText}>{forecast.recommendation}</Text>
+
+                <View style={styles.sellingPriceContainer}>
+                  <Text style={styles.sellingPriceTitle}>Recommended Selling Price:</Text>
+                  <Text style={styles.sellingPriceValue}>
+                    ₹{forecast.priceChangePercentage >= 0
+                      ? Math.round(forecast.forecastedPrice * 0.95) // Slightly below forecasted price for quick sales
+                      : Math.round(forecast.currentPrice)} {/* Current price if prices are expected to fall */}
+                  </Text>
+                  <Text style={styles.sellingPriceNote}>
+                    {forecast.priceChangePercentage >= 0
+                      ? "Set price slightly below market forecast for quick sales"
+                      : "Sell at current market price before expected price drop"}
+                  </Text>
+                </View>
               </View>
             </View>
           );
@@ -324,6 +385,26 @@ const AIForecastScreen = () => {
   return (
     <View style={styles.container}>
 
+
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputContainer}>
+          <Ionicons name="search" size={20} color={colors.mediumGray} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search fruits, vegetables, cereals..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={20} color={colors.mediumGray} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
 
       {/* Tab Selector */}
       <View style={styles.tabContainer}>
@@ -412,6 +493,30 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     paddingTop: Platform.OS === 'android' ? 30 : 0,
+  },
+  searchContainer: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lightGray,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: 8,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: Platform.OS === 'ios' ? spacing.xs : 0,
+    borderWidth: 1,
+    borderColor: colors.lightGray,
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    marginLeft: spacing.xs,
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textPrimary,
   },
   header: {
     flexDirection: 'row',
@@ -745,6 +850,33 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily.regular,
     color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  sellingPriceContainer: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.surfaceLight,
+    borderRadius: 8,
+    padding: spacing.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.success,
+  },
+  sellingPriceTitle: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.semiBold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  sellingPriceValue: {
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.success,
+    marginBottom: spacing.xs,
+  },
+  sellingPriceNote: {
+    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
   },
 });
 

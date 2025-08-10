@@ -1,5 +1,29 @@
 import { Product } from '../models/Product';
 
+export type MyFarmStackParamList = {
+  MyFarmMain: undefined;
+  ExpenseTracker: undefined;
+  AddIncome: undefined;
+  AddExpense: undefined;
+  Reports: undefined;
+  Orders: undefined;
+  DetailedReport: undefined;
+  PrelistedProducts: undefined;
+  IncomeBreakdown: undefined;
+  ExpenseBreakdown: undefined;
+  Warehouse: undefined;
+  FarmMap: undefined;
+  CropManagement: undefined;
+  CropDetails: { cropId: string };
+  AddCrop: undefined;
+  TaskManagement: undefined;
+  AddTask: undefined;
+  EditFarm: undefined;
+  SoilTest: undefined;
+  WeatherForecast: undefined;
+  EquipmentDetails: { equipmentId: string };
+};
+
 export type RootStackParamList = {
   // Auth screens
   Login: undefined;
@@ -12,6 +36,7 @@ export type RootStackParamList = {
   Marketplace: undefined;
   Learning: undefined;
   Profile: undefined;
+  'My Farm': { screen?: keyof MyFarmStackParamList; params?: any };
 
   // Verification screens
   VerifyProfile: undefined;

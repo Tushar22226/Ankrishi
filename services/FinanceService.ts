@@ -1014,13 +1014,14 @@ class FinanceService {
         planningScore = 5;
       }
 
-      // Calculate overall score using a simple addition method
-      // The total possible score is 100 points:
+      // Calculate overall score as a percentage of the maximum possible points
+      // The total possible points across all categories is 140:
       // - Income: up to 60 points (40 base + 20 stability)
       // - Expense Management: up to 35 points
       // - Debt Management: up to 15 points
       // - Savings: up to 20 points
       // - Financial Planning: up to 10 points
+      // The final score is (actual points / 140) * 100, so if any category is low, it will affect the overall score
 
       // If there's no financial data at all, return 0
       if (summary.totalIncome === 0 && summary.totalExpense === 0 && transactions.length === 0) {
@@ -1073,15 +1074,13 @@ class FinanceService {
         };
       }
 
-      // Simple addition of all scores
-      // This makes the calculation more intuitive and transparent
-      const overallScore = Math.min(100,
-        incomeStabilityScore +
-        expenseManagementScore +
-        debtManagementScore +
-        savingsScore +
-        planningScore
-      );
+      // Calculate overall score as a weighted percentage of maximum possible in each category
+      // This ensures that if any category is low, the overall score will reflect it
+      const totalMaxScore = 60 + 35 + 15 + 20 + 10; // 140 points total maximum
+      const actualTotalScore = incomeStabilityScore + expenseManagementScore + debtManagementScore + savingsScore + planningScore;
+
+      // Calculate as a percentage of the maximum possible score
+      const overallScore = Math.round((actualTotalScore / totalMaxScore) * 100);
 
       // Calculate trends
       const threeMonthsAgo = endDate - (90 * 24 * 60 * 60 * 1000);

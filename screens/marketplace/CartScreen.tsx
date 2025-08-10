@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { colors, typography, spacing, borderRadius } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import CartService, { CartItem } from '../../services/CartService';
+import MarketplaceService from '../../services/MarketplaceService';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import { getPlatformTopSpacing } from '../../utils/platformUtils';
@@ -30,6 +31,9 @@ const CartScreen = () => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [updatingQuantity, setUpdatingQuantity] = useState<string | null>(null);
   const [checkingOut, setCheckingOut] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
+  const [isCheckoutEnabled, setIsCheckoutEnabled] = useState(true);
+  const [validatingCart, setValidatingCart] = useState(false);
 
   // Load cart items on component mount
   useEffect(() => {
@@ -53,11 +57,77 @@ const CartScreen = () => {
       // Fetch cart items from CartService
       const items = await CartService.getCartItems(userProfile.uid);
       setCartItems(items);
+
+      // Validate cart items after loading
+      validateCartItems(items);
     } catch (error) {
       console.error('Error loading cart items:', error);
       Alert.alert('Error', 'Failed to load cart items');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Validate cart items for minimum quantity and available stock
+  const validateCartItems = async (items = cartItems) => {
+    if (!userProfile?.uid || items.length === 0) {
+      setIsCheckoutEnabled(false);
+      return;
+    }
+
+    try {
+      setValidatingCart(true);
+      const errors: {[key: string]: string} = {};
+      let isValid = true;
+
+      // Check each item in the cart
+      for (const item of items) {
+        try {
+          // Fetch the latest product details to check stock and minimum order quantity
+          const productDetails = await MarketplaceService.getProduct(item.productId);
+
+          if (!productDetails) {
+            errors[item.id] = 'Product no longer available';
+            isValid = false;
+            continue;
+          }
+
+          // Check if product is in stock
+          if (productDetails.stock <= 0) {
+            errors[item.id] = 'Product is out of stock';
+            isValid = false;
+            continue;
+          }
+
+          // Check if requested quantity is available
+          if (productDetails.stock < item.quantity) {
+            errors[item.id] = `Only ${productDetails.stock} units available`;
+            isValid = false;
+            continue;
+          }
+
+          // Check minimum order quantity for produce
+          if (productDetails.category === 'produce' &&
+              productDetails.minimumOrderQuantity &&
+              item.quantity < productDetails.minimumOrderQuantity) {
+            errors[item.id] = `Minimum order: ${productDetails.minimumOrderQuantity} ${productDetails.stockUnit}`;
+            isValid = false;
+            continue;
+          }
+        } catch (error) {
+          console.error(`Error validating item ${item.id}:`, error);
+          errors[item.id] = 'Error validating product';
+          isValid = false;
+        }
+      }
+
+      setValidationErrors(errors);
+      setIsCheckoutEnabled(isValid);
+    } catch (error) {
+      console.error('Error validating cart items:', error);
+      setIsCheckoutEnabled(false);
+    } finally {
+      setValidatingCart(false);
     }
   };
 
@@ -76,8 +146,7 @@ const CartScreen = () => {
 
   // Calculate shipping fee
   const calculateShippingFee = () => {
-    const subtotal = calculateSubtotal();
-    return subtotal > 1000 ? 0 : 50; // Free shipping for orders over ₹1000
+    return 100; // Fixed shipping fee of ₹100
   };
 
   // Calculate total
@@ -142,6 +211,9 @@ const CartScreen = () => {
       updatedItems[itemIndex] = { ...item, quantity: newQuantity };
 
       setCartItems(updatedItems);
+
+      // Validate cart after updating quantity
+      validateCartItems(updatedItems);
       setUpdatingQuantity(null);
     } catch (error) {
       console.error('Error updating quantity:', error);
@@ -164,6 +236,9 @@ const CartScreen = () => {
       const updatedItems = cartItems.filter(item => item.id !== itemId);
 
       setCartItems(updatedItems);
+
+      // Validate cart after removing item
+      validateCartItems(updatedItems);
       setUpdatingQuantity(null);
     } catch (error) {
       console.error('Error removing item:', error);
@@ -173,7 +248,7 @@ const CartScreen = () => {
   };
 
   // Handle checkout
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (!userProfile) {
       Alert.alert(
         'Login Required',
@@ -197,21 +272,53 @@ const CartScreen = () => {
       return;
     }
 
+    // Check minimum order quantities for produce items
+    for (const item of cartItems) {
+      try {
+        // Fetch the latest product details to check minimum order quantity
+        const productDetails = await MarketplaceService.getProduct(item.productId);
+
+        if (productDetails &&
+            productDetails.category === 'produce' &&
+            productDetails.minimumOrderQuantity &&
+            item.quantity < productDetails.minimumOrderQuantity) {
+          Alert.alert(
+            'Minimum Order Quantity Not Met',
+            `${item.name} requires a minimum order of ${productDetails.minimumOrderQuantity} ${productDetails.stockUnit}. Please update the quantity.`
+          );
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking product details:', error);
+        // Continue with checkout even if we can't verify minimum quantities
+      }
+    }
+
     setCheckingOut(true);
 
-    // Navigate to the checkout screen
-    // In a future implementation, we would pass the cart items to the checkout screen
+    // Navigate to the appropriate checkout screen based on user role
     setTimeout(() => {
       setCheckingOut(false);
-      navigation.navigate('DirectCheckout' as never, {
-        fromCart: true
-      } as never);
+
+      if (userProfile.role === 'farmer') {
+        // Farmers use MultiProductCheckoutScreen
+        navigation.navigate('MultiProductCheckout' as never, {
+          fromCart: true,
+          cartItems: cartItems
+        } as never);
+      } else {
+        // Non-farmers use DirectCheckoutScreen
+        navigation.navigate('DirectCheckout' as never, {
+          fromCart: true,
+          cartItems: cartItems
+        } as never);
+      }
     }, 500);
   };
 
   // Render a cart item
   const renderCartItem = ({ item }: { item: any }) => (
-    <Card style={styles.cartItemCard}>
+    <Card style={[styles.cartItemCard, validationErrors[item.id] ? styles.errorCard : null]}>
       <TouchableOpacity
         style={styles.itemImage}
         onPress={() => navigation.navigate('ProductDetails' as never, { productId: item.productId } as never)}
@@ -231,6 +338,13 @@ const CartScreen = () => {
         </TouchableOpacity>
 
         <Text style={styles.itemSeller}>{item.seller}</Text>
+
+        {validationErrors[item.id] && (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle" size={14} color={colors.error} />
+            <Text style={styles.errorText}>{validationErrors[item.id]}</Text>
+          </View>
+        )}
 
         <View style={styles.itemPriceRow}>
           <Text style={styles.itemPrice}>
@@ -334,9 +448,7 @@ const CartScreen = () => {
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Shipping Fee</Text>
               <Text style={styles.summaryValue}>
-                {calculateShippingFee() === 0
-                  ? 'Free'
-                  : formatCurrency(calculateShippingFee())}
+                {formatCurrency(calculateShippingFee())}
               </Text>
             </View>
 
@@ -347,13 +459,29 @@ const CartScreen = () => {
               </Text>
             </View>
 
-            <Button
-              title="Proceed to Checkout"
-              onPress={handleCheckout}
-              loading={checkingOut}
-              fullWidth
-              style={styles.checkoutButton}
-            />
+            {validatingCart ? (
+              <View style={styles.validatingContainer}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.validatingText}>Validating cart items...</Text>
+              </View>
+            ) : (
+              <>
+                {!isCheckoutEnabled && Object.keys(validationErrors).length > 0 && (
+                  <View style={styles.checkoutErrorContainer}>
+                    <Ionicons name="alert-circle" size={16} color={colors.error} />
+                    <Text style={styles.checkoutErrorText}>Please fix the issues above to proceed</Text>
+                  </View>
+                )}
+                <Button
+                  title="Proceed to Checkout"
+                  onPress={handleCheckout}
+                  loading={checkingOut}
+                  disabled={!isCheckoutEnabled || validatingCart}
+                  fullWidth
+                  style={[styles.checkoutButton, !isCheckoutEnabled && styles.disabledCheckoutButton]}
+                />
+              </>
+            )}
           </Card>
         </>
       ) : (
@@ -563,6 +691,52 @@ const styles = StyleSheet.create({
   },
   continueButton: {
     width: '80%',
+  },
+  disabledCheckoutButton: {
+    backgroundColor: colors.lightGray,
+    opacity: 0.7,
+  },
+  errorCard: {
+    borderColor: colors.error,
+    borderWidth: 1,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  errorText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.error,
+    marginLeft: spacing.xs,
+  },
+  validatingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.md,
+    padding: spacing.sm,
+  },
+  validatingText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    marginLeft: spacing.sm,
+  },
+  checkoutErrorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+    padding: spacing.xs,
+    backgroundColor: colors.errorLight,
+    borderRadius: borderRadius.sm,
+  },
+  checkoutErrorText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.error,
+    marginLeft: spacing.xs,
   },
 });
 

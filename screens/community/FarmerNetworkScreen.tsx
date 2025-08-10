@@ -22,6 +22,7 @@ import LoadingQuote from '../../components/LoadingQuote';
 import * as ImagePicker from 'expo-image-picker';
 import { storage, database } from '../../firebase/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { generateGroupCode } from '../../utils/idGenerator';
 
 // Mock events data only - as per requirements
 
@@ -86,6 +87,7 @@ const FarmerNetworkScreen = () => {
   const [activeTab, setActiveTab] = useState('groups');
   const [searchQuery, setSearchQuery] = useState('');
   const [farmerGroups, setFarmerGroups] = useState([]);
+  const [communityGroups, setCommunityGroups] = useState([]);
   const [resources, setResources] = useState([]);
   const [events, setEvents] = useState(mockEvents);
   const [joinGroupModalVisible, setJoinGroupModalVisible] = useState(false);
@@ -149,6 +151,49 @@ const FarmerNetworkScreen = () => {
               }
             }
           });
+
+          // Load all available groups for discovery
+          try {
+            const allGroupsRef = database().ref('groups');
+            const allGroupsSnapshot = await allGroupsRef.once('value');
+
+            if (allGroupsSnapshot.exists()) {
+              const allGroups = [];
+              const userJoinedGroupIds = {};
+
+              // First get the IDs of groups the user has already joined
+              const userGroupsSnapshot = await userGroupsRef.once('value');
+              if (userGroupsSnapshot.exists()) {
+                const userGroupsData = userGroupsSnapshot.val();
+                Object.keys(userGroupsData).forEach(groupId => {
+                  userJoinedGroupIds[groupId] = true;
+                });
+              }
+
+              // Process all groups
+              allGroupsSnapshot.forEach(groupSnapshot => {
+                const groupId = groupSnapshot.key;
+                const groupData = groupSnapshot.val();
+
+                // Skip if this is the user's own group or already in farmerGroups
+                const isJoined = userJoinedGroupIds[groupId] === true;
+
+                // Add to appropriate array
+                if (!isJoined) {
+                  allGroups.push({
+                    ...groupData,
+                    id: groupId,
+                    isJoined: false
+                  });
+                }
+              });
+
+              // Update community groups state
+              setCommunityGroups(allGroups);
+            }
+          } catch (error) {
+            console.error('Error loading all groups:', error);
+          }
         }
 
         // Load resources (empty for now)
@@ -172,21 +217,6 @@ const FarmerNetworkScreen = () => {
 
   // Handle joining a group
   const handleJoinGroup = async (groupId: string) => {
-    // First update the local state for immediate feedback
-    setFarmerGroups(prevGroups => {
-      const updatedGroups = prevGroups.map(group =>
-        group.id === groupId
-          ? { ...group, isJoined: !group.isJoined }
-          : group
-      );
-
-      // Save to AsyncStorage
-      AsyncStorage.setItem('farmerGroups', JSON.stringify(updatedGroups))
-        .catch(error => console.error('Error saving groups to AsyncStorage:', error));
-
-      return updatedGroups;
-    });
-
     const group = farmerGroups.find(g => g.id === groupId);
     if (!group) return;
 
@@ -194,6 +224,9 @@ const FarmerNetworkScreen = () => {
       Alert.alert('Error', 'You must be logged in to join groups');
       return;
     }
+
+    // Check if we're trying to join or leave
+    const isJoining = !group.isJoined;
 
     try {
       if (!group.isJoined) {
@@ -299,7 +332,22 @@ const FarmerNetworkScreen = () => {
         // Execute all updates
         await database().ref().update(updates);
 
-        // 5. Show success notification
+        // 5. Update local state AFTER successful Firebase update
+        setFarmerGroups(prevGroups => {
+          const updatedGroups = prevGroups.map(g =>
+            g.id === groupId
+              ? { ...g, isJoined: true }
+              : g
+          );
+
+          // Save to AsyncStorage
+          AsyncStorage.setItem('farmerGroups', JSON.stringify(updatedGroups))
+            .catch(error => console.error('Error saving groups to AsyncStorage:', error));
+
+          return updatedGroups;
+        });
+
+        // 6. Show success notification
         Alert.alert('Success', `You have joined ${group.name}`);
       } else {
         // User is leaving the group
@@ -400,9 +448,131 @@ const FarmerNetworkScreen = () => {
     }
   };
 
-  // No longer needed - community groups are merged with farmer groups
+  // Handle joining a community group
+  const handleJoinCommunityGroup = async (groupId: string) => {
+    // Find the group in communityGroups
+    const group = communityGroups.find(g => g.id === groupId);
+    if (!group) return;
 
-  // No longer needed - group chat creation is handled in handleJoinGroup and handleCreateGroup
+    if (!user) {
+      Alert.alert('Error', 'You must be logged in to join groups');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Create a batch of updates
+      const updates = {};
+
+      // 1. Add group to user's groups
+      updates[`/users/${user.uid}/groups/${groupId}`] = true;
+
+      // 2. Get current group data
+      const groupRef = database().ref(`groups/${groupId}`);
+      const groupSnapshot = await groupRef.once('value');
+
+      if (!groupSnapshot.exists()) {
+        throw new Error('Group not found');
+      }
+
+      const currentData = groupSnapshot.val();
+
+      // 3. Update members count and add user to memberIds
+      updates[`/groups/${groupId}/members`] = (currentData.members || 0) + 1;
+      updates[`/groups/${groupId}/memberIds/${user.uid}`] = true;
+      updates[`/groups/${groupId}/memberRoles/${user.uid}`] = 'member';
+
+      // 4. Create or update chat entry
+      const chatId = `group_${groupId}`;
+      const chatRef = database().ref(`chats/${chatId}`);
+      const chatSnapshot = await chatRef.once('value');
+
+      if (!chatSnapshot.exists()) {
+        // Create new chat entry
+        updates[`/chats/${chatId}`] = {
+          isGroup: true,
+          participants: {
+            [user.uid]: true,
+          },
+          participantDetails: {
+            [user.uid]: {
+              displayName: userProfile?.displayName || 'Unknown User',
+              photoURL: userProfile?.photoURL || '',
+              role: userProfile?.role || 'farmer',
+            }
+          },
+          groupDetails: {
+            id: groupId,
+            name: group.name,
+            logo: group.logo || null,
+            memberCount: (currentData.members || 0) + 1,
+          },
+          lastMessage: {
+            text: `${userProfile?.displayName || 'A new user'} joined the group`,
+            timestamp: database.ServerValue.TIMESTAMP,
+            senderId: 'system',
+          },
+          createdAt: database.ServerValue.TIMESTAMP,
+          updatedAt: database.ServerValue.TIMESTAMP,
+        };
+      } else {
+        // Update existing chat
+        const chatData = chatSnapshot.val();
+
+        // Add user to participants
+        updates[`/chats/${chatId}/participants/${user.uid}`] = true;
+
+        // Add user details
+        updates[`/chats/${chatId}/participantDetails/${user.uid}`] = {
+          displayName: userProfile?.displayName || 'Unknown User',
+          photoURL: userProfile?.photoURL || '',
+          role: userProfile?.role || 'farmer',
+        };
+
+        // Update member count
+        updates[`/chats/${chatId}/groupDetails/memberCount`] = (currentData.members || 0) + 1;
+
+        // Update last message
+        updates[`/chats/${chatId}/lastMessage`] = {
+          text: `${userProfile?.displayName || 'A new user'} joined the group`,
+          timestamp: database.ServerValue.TIMESTAMP,
+          senderId: 'system',
+        };
+
+        updates[`/chats/${chatId}/updatedAt`] = database.ServerValue.TIMESTAMP;
+      }
+
+      // 5. Add chat to user's chats
+      updates[`/users/${user.uid}/chats/${chatId}`] = true;
+
+      // Execute all updates
+      await database().ref().update(updates);
+
+      // 6. Update local state
+      // Move the group from communityGroups to farmerGroups
+      const updatedGroup = {
+        ...group,
+        isJoined: true,
+        members: (group.members || 0) + 1
+      };
+
+      setCommunityGroups(prev => prev.filter(g => g.id !== groupId));
+      setFarmerGroups(prev => [updatedGroup, ...prev]);
+
+      // Update AsyncStorage
+      const updatedFarmerGroups = [updatedGroup, ...farmerGroups];
+      await AsyncStorage.setItem('farmerGroups', JSON.stringify(updatedFarmerGroups));
+
+      // 7. Show success notification
+      Alert.alert('Success', `You have joined ${group.name}`);
+    } catch (error) {
+      console.error('Error joining community group:', error);
+      Alert.alert('Error', 'Failed to join group. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Handle joining a group by code
   const handleJoinByCode = async () => {
@@ -464,15 +634,99 @@ const FarmerNetworkScreen = () => {
         return;
       }
 
-      // Add the group to the user's groups
+      // Create a batch of updates
+      const updates = {};
+
+      // 1. Add group to user's groups
+      updates[`/users/${user.uid}/groups/${groupId}`] = true;
+
+      // 2. Update members count and add user to memberIds
+      updates[`/groups/${groupId}/members`] = (groupData.members || 0) + 1;
+      updates[`/groups/${groupId}/memberIds/${user.uid}`] = true;
+      updates[`/groups/${groupId}/memberRoles/${user.uid}`] = 'member';
+
+      // 3. Create or update chat entry
+      const chatId = `group_${groupId}`;
+      const chatRef = database().ref(`chats/${chatId}`);
+      const chatSnapshot = await chatRef.once('value');
+
+      if (!chatSnapshot.exists()) {
+        // Create new chat entry
+        updates[`/chats/${chatId}`] = {
+          isGroup: true,
+          participants: {
+            [user.uid]: true,
+          },
+          participantDetails: {
+            [user.uid]: {
+              displayName: userProfile?.displayName || 'Unknown User',
+              photoURL: userProfile?.photoURL || '',
+              role: userProfile?.role || 'farmer',
+            }
+          },
+          groupDetails: {
+            id: groupId,
+            name: groupData.name,
+            logo: groupData.logo || null,
+            memberCount: (groupData.members || 0) + 1,
+          },
+          lastMessage: {
+            text: `${userProfile?.displayName || 'A new user'} joined the group`,
+            timestamp: database.ServerValue.TIMESTAMP,
+            senderId: 'system',
+          },
+          createdAt: database.ServerValue.TIMESTAMP,
+          updatedAt: database.ServerValue.TIMESTAMP,
+        };
+      } else {
+        // Update existing chat
+        const chatData = chatSnapshot.val();
+
+        // Add user to participants
+        updates[`/chats/${chatId}/participants/${user.uid}`] = true;
+
+        // Add user details
+        updates[`/chats/${chatId}/participantDetails/${user.uid}`] = {
+          displayName: userProfile?.displayName || 'Unknown User',
+          photoURL: userProfile?.photoURL || '',
+          role: userProfile?.role || 'farmer',
+        };
+
+        // Update member count
+        updates[`/chats/${chatId}/groupDetails/memberCount`] = (groupData.members || 0) + 1;
+
+        // Update last message
+        updates[`/chats/${chatId}/lastMessage`] = {
+          text: `${userProfile?.displayName || 'A new user'} joined the group`,
+          timestamp: database.ServerValue.TIMESTAMP,
+          senderId: 'system',
+        };
+
+        updates[`/chats/${chatId}/updatedAt`] = database.ServerValue.TIMESTAMP;
+      }
+
+      // 4. Add chat to user's chats
+      updates[`/users/${user.uid}/chats/${chatId}`] = true;
+
+      // Execute all updates
+      await database().ref().update(updates);
+
+      // 5. Update local state
       const groupWithId = {
         ...groupData,
         id: groupId,
         isJoined: true
       };
 
-      // Join the group
-      await handleJoinGroup(groupId);
+      // Add to farmerGroups
+      setFarmerGroups(prev => [groupWithId, ...prev]);
+
+      // Update AsyncStorage
+      const updatedFarmerGroups = [groupWithId, ...farmerGroups];
+      await AsyncStorage.setItem('farmerGroups', JSON.stringify(updatedFarmerGroups));
+
+      // Show success notification
+      Alert.alert('Success', `You have joined ${groupData.name}`);
 
       setJoinGroupModalVisible(false);
       setGroupCodeInput('');
@@ -512,8 +766,8 @@ const FarmerNetworkScreen = () => {
         throw new Error('Failed to generate group ID');
       }
 
-      // Generate a unique group code
-      const groupCode = `FG${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+      // Generate a consistent group code based on the group ID
+      const groupCode = generateGroupCode(groupId);
 
       // Upload logo if available
       let logoUrl = null;

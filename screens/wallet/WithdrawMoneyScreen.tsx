@@ -22,13 +22,16 @@ import { getPlatformTopSpacing } from '../../utils/platformUtils';
 
 const WithdrawMoneyScreen = () => {
   const navigation = useNavigation();
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const { colors } = useTheme();
-  
+
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingBalance, setLoadingBalance] = useState(true);
   const [currentBalance, setCurrentBalance] = useState(0);
+  const [availableBalance, setAvailableBalance] = useState(0);
+  const [heldBalance, setHeldBalance] = useState(0);
+  const [pendingEarnings, setPendingEarnings] = useState(0);
   const [error, setError] = useState('');
 
   // Create styles with the current theme colors
@@ -72,18 +75,21 @@ const WithdrawMoneyScreen = () => {
       marginBottom: spacing.sm,
     },
     balanceContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
       backgroundColor: colors.surfaceLight,
       padding: spacing.md,
       borderRadius: borderRadius.md,
       marginBottom: spacing.lg,
     },
+    balanceRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.sm,
+    },
     balanceLabel: {
       fontSize: typography.fontSize.md,
       fontFamily: typography.fontFamily.medium,
       color: colors.textPrimary,
-      marginRight: spacing.sm,
     },
     balanceAmount: {
       fontSize: typography.fontSize.md,
@@ -146,11 +152,23 @@ const WithdrawMoneyScreen = () => {
   useEffect(() => {
     const loadBalance = async () => {
       if (!user) return;
-      
+
       try {
         setLoadingBalance(true);
         const balance = await WalletService.getBalance(user.uid);
+        const available = await WalletService.getAvailableBalance(user.uid);
+        const held = await WalletService.getHeldBalance(user.uid);
+
+        // Get pending earnings (for farmers)
+        let pending = 0;
+        if (userProfile?.role === 'farmer') {
+          pending = await WalletService.getPendingEarnings(user.uid);
+        }
+
         setCurrentBalance(balance);
+        setAvailableBalance(available);
+        setHeldBalance(held);
+        setPendingEarnings(pending);
       } catch (error) {
         console.error('Error loading balance:', error);
         Alert.alert('Error', 'Failed to load current balance');
@@ -168,23 +186,23 @@ const WithdrawMoneyScreen = () => {
       setError('Please enter an amount');
       return false;
     }
-    
+
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount)) {
       setError('Please enter a valid amount');
       return false;
     }
-    
+
     if (numAmount <= 0) {
       setError('Amount must be greater than 0');
       return false;
     }
-    
-    if (numAmount > currentBalance) {
-      setError('Amount exceeds your current balance');
+
+    if (numAmount > availableBalance) {
+      setError('Amount exceeds your available balance. Some funds may be held for pending orders.');
       return false;
     }
-    
+
     setError('');
     return true;
   };
@@ -192,12 +210,12 @@ const WithdrawMoneyScreen = () => {
   // Handle withdraw money
   const handleWithdrawMoney = async () => {
     if (!validateAmount() || !user) return;
-    
+
     try {
       setLoading(true);
       const numAmount = parseFloat(amount);
       await WalletService.withdrawBalance(user.uid, numAmount, 'Withdrawn via wallet screen');
-      
+
       Alert.alert(
         'Success',
         `₹${numAmount.toFixed(2)} has been withdrawn from your wallet`,
@@ -224,14 +242,14 @@ const WithdrawMoneyScreen = () => {
 
   // Handle max amount
   const handleMaxAmount = () => {
-    setAmount(currentBalance.toString());
+    setAmount(availableBalance.toString());
     setError('');
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
@@ -244,7 +262,7 @@ const WithdrawMoneyScreen = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <ScrollView 
+        <ScrollView
           style={styles.content}
           showsVerticalScrollIndicator={false}
         >
@@ -252,18 +270,42 @@ const WithdrawMoneyScreen = () => {
             <View style={styles.walletIcon}>
               <Ionicons name="cash-outline" size={40} color={colors.primary} />
             </View>
-            
+
             <View style={styles.balanceContainer}>
-              <Text style={styles.balanceLabel}>Current Balance:</Text>
               {loadingBalance ? (
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : (
-                <Text style={styles.balanceAmount}>₹{currentBalance.toFixed(2)}</Text>
+                <View style={{width: '100%'}}>
+                  <View style={styles.balanceRow}>
+                    <Text style={styles.balanceLabel}>Total Balance:</Text>
+                    <Text style={styles.balanceAmount}>₹{currentBalance.toFixed(2)}</Text>
+                  </View>
+
+                  <View style={styles.balanceRow}>
+                    <Text style={styles.balanceLabel}>Held for Orders:</Text>
+                    <Text style={[styles.balanceAmount, {color: colors.warning}]}>₹{heldBalance.toFixed(2)}</Text>
+                  </View>
+
+                  {userProfile?.role === 'farmer' && pendingEarnings > 0 && (
+                    <View style={styles.balanceRow}>
+                      <Text style={styles.balanceLabel}>Pending Earnings:</Text>
+                      <Text style={[styles.balanceAmount, {color: '#9C27B0'}]}>₹{pendingEarnings.toFixed(2)}</Text>
+                      <TouchableOpacity onPress={() => Alert.alert('Pending Earnings', 'These are earnings from confirmed orders that will be transferred to your wallet once delivery is completed.')}>
+                        <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} style={{marginLeft: 4}} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  <View style={[styles.balanceRow, {borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.sm, marginTop: spacing.xs}]}>
+                    <Text style={[styles.balanceLabel, {fontFamily: typography.fontFamily.bold}]}>Available Balance:</Text>
+                    <Text style={[styles.balanceAmount, {fontFamily: typography.fontFamily.bold}]}>₹{availableBalance.toFixed(2)}</Text>
+                  </View>
+                </View>
               )}
             </View>
-            
+
             <Text style={styles.label}>Enter Amount to Withdraw</Text>
-            
+
             <View style={styles.amountInputContainer}>
               <Text style={styles.currencySymbol}>₹</Text>
               <Input
@@ -284,63 +326,63 @@ const WithdrawMoneyScreen = () => {
                 }
               />
             </View>
-            
+
             <Text style={styles.label}>Quick Select</Text>
             <View style={styles.quickAmountContainer}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.quickAmountButton}
                 onPress={() => handleQuickAmount(100)}
-                disabled={currentBalance < 100}
+                disabled={availableBalance < 100}
               >
                 <Text style={styles.quickAmountText}>₹100</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.quickAmountButton}
                 onPress={() => handleQuickAmount(200)}
-                disabled={currentBalance < 200}
+                disabled={availableBalance < 200}
               >
                 <Text style={styles.quickAmountText}>₹200</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.quickAmountButton}
                 onPress={() => handleQuickAmount(500)}
-                disabled={currentBalance < 500}
+                disabled={availableBalance < 500}
               >
                 <Text style={styles.quickAmountText}>₹500</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.quickAmountButton}
                 onPress={() => handleQuickAmount(1000)}
-                disabled={currentBalance < 1000}
+                disabled={availableBalance < 1000}
               >
                 <Text style={styles.quickAmountText}>₹1000</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.quickAmountButton}
-                onPress={() => handleQuickAmount(Math.floor(currentBalance / 2))}
-                disabled={currentBalance <= 0}
+                onPress={() => handleQuickAmount(Math.floor(availableBalance / 2))}
+                disabled={availableBalance <= 0}
               >
                 <Text style={styles.quickAmountText}>Half</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.quickAmountButton}
                 onPress={handleMaxAmount}
-                disabled={currentBalance <= 0}
+                disabled={availableBalance <= 0}
               >
                 <Text style={styles.quickAmountText}>All</Text>
               </TouchableOpacity>
             </View>
-            
+
             <Text style={styles.infoText}>
-              Withdraw money from your Ankrishi-Wallet to your bank account. The amount 
+              Withdraw money from your Ankrishi-Wallet to your bank account. The amount
               will be transferred within 1-3 business days. A small processing fee may apply.
             </Text>
-            
+
             <Button
               title="Withdraw Money"
               onPress={handleWithdrawMoney}
               loading={loading}
-              disabled={loading || loadingBalance || currentBalance <= 0}
+              disabled={loading || loadingBalance || availableBalance <= 0}
               size="large"
               style={styles.buttonContainer}
               leftIcon={<Ionicons name="arrow-down-outline" size={20} color={colors.white} />}

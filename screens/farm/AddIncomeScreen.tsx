@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { MyFarmStackParamList } from '../../navigation/types';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors, typography, spacing, borderRadius } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
@@ -33,8 +35,10 @@ const incomeCategories = [
   { id: 'other_income', name: 'Other Income', icon: 'cash' },
 ];
 
+type AddIncomeScreenNavigationProp = NativeStackNavigationProp<MyFarmStackParamList, 'AddIncome'>;
+
 const AddIncomeScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<AddIncomeScreenNavigationProp>();
   const { userProfile } = useAuth();
 
   // Form state
@@ -146,7 +150,7 @@ const AddIncomeScreen = () => {
         [
           {
             text: 'OK',
-            onPress: () => navigation.goBack(),
+            onPress: () => navigation.navigate('MyFarmMain'),
           },
         ]
       );

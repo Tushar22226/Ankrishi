@@ -18,6 +18,8 @@ import Card from '../../components/Card';
 import Button from '../../components/Button';
 import { getPlatformTopSpacing } from '../../utils/platformUtils';
 import ContractService from '../../services/ContractService';
+import ContractPDFService from '../../services/ContractPDFService';
+import DocumentService from '../../services/DocumentService';
 import LoadingQuote from '../../components/LoadingQuote';
 
 // Format date
@@ -97,6 +99,7 @@ const ContractDetailsScreen = () => {
   const [submittingBid, setSubmittingBid] = useState(false);
   const [acceptingBid, setAcceptingBid] = useState(false);
   const [rejectingBid, setRejectingBid] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   // Load contract on component mount
   useEffect(() => {
@@ -441,6 +444,80 @@ const ContractDetailsScreen = () => {
     // Check if farmer has enough land
     return normalizedFarmerLandArea >= contractLandArea;
   };
+
+  // Generate and save contract PDF
+  const handleGenerateContractPDF = async () => {
+    if (!contract || !userProfile) {
+      Alert.alert('Error', 'Contract or user profile not found');
+      return;
+    }
+
+    try {
+      setGeneratingPdf(true);
+
+      // Check if the contract already has a PDF URL stored
+      if (contract.pdfUrl) {
+        // If PDF already exists, just save it to documents
+        await saveContractToDocuments(contract.pdfUrl);
+        return;
+      }
+
+      // Generate the PDF and get the download URL
+      const pdfUrl = await ContractPDFService.generateContractPDF(contract);
+
+      // Save the PDF to the user's documents
+      await saveContractToDocuments(pdfUrl);
+
+      // Show success message
+      Alert.alert('Success', 'Contract PDF generated and saved to your documents');
+    } catch (error) {
+      console.error('Error generating contract PDF:', error);
+      Alert.alert('Error', 'Failed to generate contract PDF. Please try again.');
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  // Save contract PDF to documents
+  const saveContractToDocuments = async (pdfUrl: string) => {
+    if (!userProfile?.uid || !contract) return;
+
+    try {
+      // Create document object
+      const documentData = {
+        title: `Contract: ${contract.title}`,
+        type: 'invoice',
+        fileName: `contract_${contract.id}.pdf`,
+        fileSize: 0.5, // Approximate size in MB
+        uploadDate: Date.now(),
+        expiryDate: contract.endDate ? new Date(contract.endDate).getTime() : null,
+        tags: ['contract', contract.type, contract.status],
+        url: pdfUrl,
+        userId: userProfile.uid
+      };
+
+      // Check if document already exists
+      const documents = await DocumentService.getUserDocuments(userProfile.uid);
+      const existingDoc = documents.find(doc =>
+        doc.title === documentData.title && doc.url === documentData.url
+      );
+
+      if (existingDoc) {
+        console.log('Document already exists in user documents');
+        Alert.alert('Info', 'This contract is already saved in your documents');
+        return;
+      }
+
+      // Save to documents collection
+      await DocumentService.addDocument(documentData);
+      console.log('Contract saved to documents');
+    } catch (error) {
+      console.error('Error saving contract to documents:', error);
+      throw error;
+    }
+  };
+
+  // Generate and save contract PDF
 
   // Check if user can bid
   const canBid = (): boolean => {
@@ -1051,6 +1128,16 @@ const ContractDetailsScreen = () => {
                 </View>
               </View>
 
+              <View style={styles.contractActions}>
+                <Button
+                  title={generatingPdf ? "Generating PDF..." : "Generate Contract PDF"}
+                  onPress={handleGenerateContractPDF}
+                  disabled={generatingPdf}
+                  style={styles.contractActionButton}
+                  icon="document-text-outline"
+                />
+              </View>
+
               <View style={styles.contractActivatedDetails}>
                 <Text style={styles.contractActivatedLabel}>Parties:</Text>
                 <View style={styles.contractActivatedParties}>
@@ -1063,38 +1150,50 @@ const ContractDetailsScreen = () => {
                 </View>
               </View>
 
-              <View style={styles.contractActivatedActions}>
-                <Button
-                  title="Manage Contract"
-                  onPress={() => {
-                    // Navigate to contract management screen
-                    // @ts-ignore - Navigation types are complex
-                    navigation.navigate('ContractDetailsManagement', {
-                      contractId: contract.id
-                    });
-                  }}
-                  style={styles.contractActivatedButton}
-                />
-
-                {contract.chatId && (
+              <Card style={styles.actionsCard}>
+                <Text style={styles.actionsCardTitle}>Contract Actions</Text>
+                <View style={styles.contractActivatedActions}>
                   <Button
-                    title="Open Chat"
+                    title="Manage Contract"
                     onPress={() => {
-                      // Navigate to the chat screen
+                      // Navigate to contract management screen
                       // @ts-ignore - Navigation types are complex
-                      navigation.navigate('ChatScreen', {
-                        chatId: contract.chatId,
-                        recipientId: contract.parties.secondPartyId,
-                        recipientName: contract.parties.secondPartyUsername,
-                        recipientPhoto: '',
-                        isGroup: false,
+                      navigation.navigate('ContractDetailsManagement', {
+                        contractId: contract.id
                       });
                     }}
-                    variant="outline"
-                    style={{...styles.contractActivatedButton, marginLeft: spacing.md}}
+                    style={styles.contractActivatedButton}
                   />
-                )}
-              </View>
+
+                  <Button
+                    title={generatingPdf ? "Generating PDF..." : "Generate PDF"}
+                    onPress={handleGenerateContractPDF}
+                    disabled={generatingPdf}
+                    variant="outline"
+                    style={styles.contractActivatedButton}
+                    icon={generatingPdf ? undefined : "document-outline"}
+                  />
+
+                  {contract.chatId && (
+                    <Button
+                      title="Open Chat"
+                      onPress={() => {
+                        // Navigate to the chat screen
+                        // @ts-ignore - Navigation types are complex
+                        navigation.navigate('ChatScreen', {
+                          chatId: contract.chatId,
+                          recipientId: contract.parties.secondPartyId,
+                          recipientName: contract.parties.secondPartyUsername,
+                          recipientPhoto: '',
+                          isGroup: false,
+                        });
+                      }}
+                      variant="outline"
+                      style={styles.contractActivatedButton}
+                    />
+                  )}
+                </View>
+              </Card>
             </View>
           )}
 
@@ -1298,38 +1397,41 @@ const ContractDetailsScreen = () => {
                 <Text style={styles.contractParticipantValue}>{contract.parties.firstPartyUsername}</Text>
               </View>
 
-              <View style={styles.contractParticipantActions}>
-                <Button
-                  title="Manage Contract"
-                  onPress={() => {
-                    // Navigate to contract management screen
-                    // @ts-ignore - Navigation types are complex
-                    navigation.navigate('ContractDetailsManagement', {
-                      contractId: contract.id
-                    });
-                  }}
-                  style={styles.contractParticipantButton}
-                />
-
-                {contract.chatId && (
+              <Card style={styles.actionsCard}>
+                <Text style={styles.actionsCardTitle}>Contract Actions</Text>
+                <View style={styles.contractParticipantActions}>
                   <Button
-                    title="Open Chat"
+                    title="Manage Contract"
                     onPress={() => {
-                      // Navigate to the chat screen
+                      // Navigate to contract management screen
                       // @ts-ignore - Navigation types are complex
-                      navigation.navigate('ChatScreen', {
-                        chatId: contract.chatId,
-                        recipientId: contract.creatorId,
-                        recipientName: contract.parties.firstPartyUsername,
-                        recipientPhoto: '',
-                        isGroup: false,
+                      navigation.navigate('ContractDetailsManagement', {
+                        contractId: contract.id
                       });
                     }}
-                    variant="outline"
-                    style={{...styles.contractParticipantButton, marginLeft: spacing.md}}
+                    style={styles.contractParticipantButton}
                   />
-                )}
-              </View>
+
+                  {contract.chatId && (
+                    <Button
+                      title="Open Chat"
+                      onPress={() => {
+                        // Navigate to the chat screen
+                        // @ts-ignore - Navigation types are complex
+                        navigation.navigate('ChatScreen', {
+                          chatId: contract.chatId,
+                          recipientId: contract.creatorId,
+                          recipientName: contract.parties.firstPartyUsername,
+                          recipientPhoto: '',
+                          isGroup: false,
+                        });
+                      }}
+                      variant="outline"
+                      style={styles.contractActivatedButton}
+                    />
+                  )}
+                </View>
+              </Card>
             </View>
           )}
 
@@ -1648,7 +1750,7 @@ const styles = StyleSheet.create({
   applyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.success,
+    backgroundColor: colors.primary,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.md,
@@ -1659,7 +1761,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   alreadyAppliedButton: {
-    backgroundColor: colors.success,
+    backgroundColor: colors.primary,
   },
   applyButtonText: {
     fontSize: typography.fontSize.sm,
@@ -1822,7 +1924,7 @@ const styles = StyleSheet.create({
   acceptedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.success,
+    backgroundColor: colors.primary,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.sm,
@@ -1933,7 +2035,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.warning,
   },
   acceptedStatusBadge: {
-    backgroundColor: colors.success,
+    backgroundColor: colors.primary,
   },
   rejectedStatusBadge: {
     backgroundColor: colors.error,
@@ -2026,10 +2128,31 @@ const styles = StyleSheet.create({
   contractActivatedActions: {
     marginTop: spacing.md,
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+  },
+  actionsCard: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    backgroundColor: colors.white,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    borderRadius: borderRadius.md,
+  },
+  actionsCardTitle: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
   },
   contractActivatedButton: {
-    minWidth: 200,
+    flex: 1,
+    maxWidth: 200,
   },
 
   // Bid Accepted Styles
@@ -2040,7 +2163,7 @@ const styles = StyleSheet.create({
   },
   bidAcceptedButton: {
     minWidth: 200,
-    backgroundColor: colors.success,
+    backgroundColor: colors.primary,
   },
 
   // Contract Participant Styles
@@ -2088,11 +2211,15 @@ const styles = StyleSheet.create({
   contractParticipantActions: {
     marginTop: spacing.md,
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.md,
   },
   contractParticipantButton: {
-    minWidth: 200,
-    backgroundColor: colors.success,
+    flex: 1,
+    maxWidth: 200,
+    backgroundColor: colors.primary,
   },
   submitBidButton: {
     marginBottom: spacing.md,
@@ -2328,6 +2455,13 @@ const styles = StyleSheet.create({
   aaccComplianceStandards: {
     marginLeft: spacing.sm,
     flex: 1,
+  },
+  contractActions: {
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  contractActionButton: {
+    marginTop: spacing.sm,
   },
 });
 

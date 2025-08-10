@@ -23,26 +23,49 @@ type FinancialPlanViewScreenRouteProp = RouteProp<
 >;
 
 interface PlanData {
-  userId: string;
-  userName: string;
+  userId?: string;
+  userName?: string;
   farmingType: string;
-  cropType: string;
+  primaryCrop: string;
+  cropType?: string; // For backward compatibility
   landSize: number;
-  expectedYield: number;
+  expectedYield?: number;
   currentSavings: number;
-  monthlyIncome: number;
-  monthlyExpenses: number;
+  annualFarmIncome?: number;
+  monthlyIncome?: number;
+  monthlyExpenses?: number;
+  monthlyHouseholdExpenses?: number;
   loanAmount: number;
-  interestRate: number;
-  planDuration: number;
-  selectedCrops: string[];
-  selectedFruits: string[];
-  selectedVegetables: string[];
+  loanType?: string;
+  loanDuration?: number;
+  customInterestRate?: number | null;
+  monthlyLoanPayment?: number | null;
+  interestRate?: number;
+  planDuration?: number;
+  selectedCrops?: string[];
+  selectedFruits?: string[];
+  selectedVegetables?: string[];
   createdAt: number;
+  planType?: string;
+  state?: string;
+  district?: string;
+  irrigationType?: string;
+  aiPredictions?: {
+    yieldPrediction: any;
+    pricePrediction: any;
+    costOptimization: any;
+    riskAssessment: any;
+    governmentBenefits: any;
+    cashFlowProjection: any;
+    recommendations: any[];
+  };
 }
 
 interface MonthlyProjection {
   month: number;
+  calendarMonth?: number;
+  monthName?: string;
+  year?: number;
   income: number;
   expenses: number;
   savings: number;
@@ -86,59 +109,187 @@ const FinancialPlanViewScreen = () => {
     let runningSavings = planData.currentSavings;
     let loanBalance = planData.loanAmount;
 
+    // Use AI predictions if available, otherwise fallback to old logic
+    if (planData.aiPredictions?.cashFlowProjection) {
+      // Use AI-generated cash flow projections
+      const aiProjections = planData.aiPredictions.cashFlowProjection.monthlyProjections;
+
+      aiProjections.forEach((projection: any, index: number) => {
+        runningSavings += projection.netCashFlow;
+        runningIncome += projection.income;
+        runningExpenses += projection.expenses;
+
+        monthlyProjections.push({
+          month: projection.month,
+          income: projection.income,
+          expenses: projection.expenses,
+          savings: Math.round(runningSavings),
+          loanBalance: Math.round(loanBalance),
+          cashFlow: projection.netCashFlow,
+        });
+      });
+
+      setProjections(monthlyProjections);
+      setTotalIncome(planData.aiPredictions.cashFlowProjection.annualIncome);
+      setTotalExpenses(planData.aiPredictions.cashFlowProjection.annualExpenses);
+      setNetSavings(planData.aiPredictions.cashFlowProjection.netAnnualIncome);
+      return;
+    }
+
+    // Fallback to old calculation logic
+    const cropType = planData.primaryCrop || planData.cropType || '';
+    const monthlyIncome = planData.monthlyIncome || (planData.annualFarmIncome || 0) / 12;
+    const monthlyExpenses = planData.monthlyExpenses || planData.monthlyHouseholdExpenses || 0;
+    const interestRate = planData.interestRate || 4.0;
+    const planDuration = planData.planDuration || 12;
+
     // Calculate monthly loan payment if there's a loan
-    const monthlyLoanPayment = calculateMonthlyLoanPayment(
-      planData.loanAmount,
-      planData.interestRate,
-      planData.planDuration
-    );
+    const monthlyLoanPayment = planData.monthlyLoanPayment ||
+      calculateMonthlyLoanPayment(
+        planData.loanAmount,
+        interestRate,
+        planData.loanDuration || planDuration
+      );
 
-    // Generate projections for each month
-    for (let month = 1; month <= planData.planDuration; month++) {
-      // Basic monthly income and expenses
-      let monthlyIncome = planData.monthlyIncome;
-      let monthlyExpenses = planData.monthlyExpenses + monthlyLoanPayment;
+    // Get harvest schedule based on farming type
+    const harvestSchedule = getHarvestSchedule(planData.farmingType, cropType);
 
-      // Add crop income for harvest months (assuming harvest every 3 months)
-      if (month % 3 === 0 && planData.expectedYield > 0) {
-        // Simple estimation of crop income
-        const cropIncome = estimateCropIncome(planData.cropType, planData.expectedYield);
-        monthlyIncome += cropIncome / (planData.planDuration / 3); // Distribute across harvest months
+    // Calculate total crop income for the plan duration using AI prediction
+    const totalCropIncome = planData.expectedYield && planData.expectedYield > 0 ?
+      estimateCropIncome(cropType, planData.expectedYield, 6, planData.landSize) : 0;
+
+    // Generate projections for 12 months starting from today
+    const today = new Date();
+    const startMonth = today.getMonth() + 1; // Current month (1-12)
+    const startYear = today.getFullYear();
+
+    for (let i = 0; i < 12; i++) {
+      // Calculate actual calendar month and year
+      const currentDate = new Date(startYear, today.getMonth() + i, 1);
+      const calendarMonth = currentDate.getMonth() + 1; // 1-12
+      const year = currentDate.getFullYear();
+      const monthName = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+      // Basic monthly income (regular income like dairy, salary, etc.)
+      let currentMonthlyIncome = monthlyIncome;
+
+      // Add seasonal crop income based on harvest schedule
+      if (harvestSchedule.includes(calendarMonth) && totalCropIncome > 0) {
+        // Distribute crop income across harvest months
+        currentMonthlyIncome += totalCropIncome / harvestSchedule.length;
+      }
+
+      // Calculate monthly expenses (including loan payment)
+      let currentMonthlyExpenses = monthlyExpenses;
+      if (loanBalance > 0 && monthlyLoanPayment > 0) {
+        currentMonthlyExpenses += monthlyLoanPayment;
       }
 
       // Calculate monthly cash flow
-      const cashFlow = monthlyIncome - monthlyExpenses;
+      const cashFlow = currentMonthlyIncome - currentMonthlyExpenses;
 
       // Update savings
       runningSavings += cashFlow;
 
-      // Update loan balance
-      if (loanBalance > 0) {
-        // Simple interest calculation
-        const interestPayment = (loanBalance * (planData.interestRate / 100)) / 12;
-        const principalPayment = monthlyLoanPayment - interestPayment;
-        loanBalance = Math.max(0, loanBalance - principalPayment);
+      // Update loan balance with proper EMI calculation
+      if (loanBalance > 0 && monthlyLoanPayment > 0) {
+        const monthlyInterestRate = (interestRate / 100) / 12;
+        const interestPayment = loanBalance * monthlyInterestRate;
+        const principalPayment = Math.max(0, monthlyLoanPayment - interestPayment);
+
+        // Ensure we don't pay more principal than remaining balance
+        const actualPrincipalPayment = Math.min(principalPayment, loanBalance);
+        loanBalance = Math.max(0, loanBalance - actualPrincipalPayment);
       }
 
       // Update running totals
-      runningIncome += monthlyIncome;
-      runningExpenses += monthlyExpenses;
+      runningIncome += currentMonthlyIncome;
+      runningExpenses += currentMonthlyExpenses;
 
-      // Add to projections
+      // Add to projections with actual calendar information
       monthlyProjections.push({
-        month,
-        income: monthlyIncome,
-        expenses: monthlyExpenses,
-        savings: runningSavings,
-        loanBalance,
-        cashFlow,
+        month: i + 1, // Sequential month number for display
+        calendarMonth, // Actual calendar month (1-12)
+        monthName, // Full month name with year
+        year,
+        income: Math.round(currentMonthlyIncome),
+        expenses: Math.round(currentMonthlyExpenses),
+        savings: Math.round(runningSavings),
+        loanBalance: Math.round(loanBalance),
+        cashFlow: Math.round(cashFlow),
       });
     }
 
     setProjections(monthlyProjections);
-    setTotalIncome(runningIncome);
-    setTotalExpenses(runningExpenses);
-    setNetSavings(runningSavings - planData.currentSavings);
+    setTotalIncome(Math.round(runningIncome));
+    setTotalExpenses(Math.round(runningExpenses));
+    setNetSavings(Math.round(runningSavings - planData.currentSavings));
+  };
+
+  // Get realistic harvest schedule based on farming type and crop
+  const getHarvestSchedule = (farmingType: string, cropType: string): number[] => {
+    // Default harvest months based on farming type and crop
+    const harvestSchedules: Record<string, number[]> = {
+      // Crops - typically 1-2 harvests per year
+      'Rice': [4, 10], // Kharif and Rabi seasons
+      'Wheat': [4], // Rabi harvest
+      'Corn': [6, 11], // Kharif and Rabi
+      'Sugarcane': [12], // Annual harvest
+      'Cotton': [10], // Kharif harvest
+      'Soybean': [9], // Kharif harvest
+      'Lentils (Dal)': [4], // Rabi harvest
+      'Chickpea': [4], // Rabi harvest
+      'Mustard': [4], // Rabi harvest
+      'Groundnut': [6, 10], // Two seasons
+      'Sunflower': [6, 11], // Two seasons
+
+      // Fruits - seasonal harvests
+      'Mango': [5, 6], // Summer harvest
+      'Banana': [3, 6, 9, 12], // Year-round with peaks
+      'Apple': [9, 10], // Autumn harvest
+      'Orange': [12, 1], // Winter harvest
+      'Grapes': [3, 4], // Spring harvest
+      'Watermelon': [5, 6], // Summer harvest
+      'Papaya': [2, 4, 6, 8, 10, 12], // Multiple harvests
+      'Guava': [11, 12], // Winter harvest
+      'Pomegranate': [10, 11], // Post-monsoon
+      'Pineapple': [6], // Summer harvest
+
+      // Vegetables - multiple harvests
+      'Potato': [3, 11], // Two main seasons (spring and post-monsoon)
+      'Tomato': [2, 4, 6, 8, 10, 12], // Multiple harvests year-round
+      'Onion': [4, 11], // Two seasons (rabi and kharif)
+      'Cabbage': [1, 2, 11, 12], // Winter crops (cool season)
+      'Cauliflower': [1, 2, 12], // Winter harvest only (cool season)
+      'Brinjal': [1, 3, 5, 7, 9, 11], // Multiple harvests (warm season)
+      'Okra': [6, 7, 8, 9], // Monsoon/summer season (warm season)
+      'Spinach': [1, 2, 11, 12], // Winter leafy (cool season)
+      'Carrot': [1, 2, 12], // Winter harvest (cool season)
+      'Peas': [1, 2, 3], // Winter harvest (cool season)
+    };
+
+    // For dairy, income is monthly
+    if (farmingType === 'dairy') {
+      return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]; // Monthly income
+    }
+
+    // Get specific crop schedule or default based on farming type
+    const schedule = harvestSchedules[cropType];
+    if (schedule) {
+      return schedule;
+    }
+
+    // Default schedules by farming type
+    switch (farmingType) {
+      case 'crops':
+        return [4, 10]; // Two seasons
+      case 'fruits':
+        return [6]; // Annual harvest
+      case 'vegetables':
+        return [3, 6, 9, 12]; // Quarterly harvests
+      default:
+        return [6, 12]; // Bi-annual
+    }
   };
 
   const calculateMonthlyLoanPayment = (principal: number, rate: number, months: number): number => {
@@ -152,37 +303,216 @@ const FinancialPlanViewScreen = () => {
            (Math.pow(1 + monthlyRate, months) - 1);
   };
 
-  const estimateCropIncome = (cropType: string, yield_: number): number => {
-    // Simple estimation based on crop type and yield
-    // In a real app, this would use market data and more sophisticated models
-    const pricePerQuintal: Record<string, number> = {
-      'Rice': 2000,
-      'Wheat': 1800,
-      'Corn': 1500,
-      'Sugarcane': 300,
-      'Cotton': 5000,
-      'Soybean': 3500,
-      'Potato': 1200,
-      'Tomato': 1500,
-      'Onion': 1800,
-      'Chili': 6000,
-      'Lentils (Dal)': 5500,
-      'Chickpea': 4500,
-      'Mustard': 4000,
-      'Groundnut': 5000,
-      'Sunflower': 3800,
+  // AI Rules-Based Price Prediction Model
+  const getMarketPricePrediction = (cropType: string, month: number, landSize: number) => {
+    // Base prices per quintal (current market rates)
+    const basePrices: Record<string, number> = {
+      'Rice': 2100, 'Wheat': 2250, 'Corn': 1850, 'Sugarcane': 380, 'Cotton': 6200,
+      'Soybean': 4600, 'Lentils (Dal)': 6500, 'Chickpea': 5800, 'Mustard': 5200,
+      'Groundnut': 5500, 'Sunflower': 6000,
+      'Mango': 3200, 'Banana': 1200, 'Apple': 8500, 'Orange': 2800, 'Grapes': 4500,
+      'Watermelon': 800, 'Papaya': 1500, 'Guava': 2000, 'Pomegranate': 6000, 'Pineapple': 2500,
+      'Potato': 1300, 'Tomato': 2800, 'Onion': 1600, 'Cabbage': 1000, 'Cauliflower': 1800,
+      'Brinjal': 2200, 'Okra': 3000, 'Spinach': 2500, 'Carrot': 2000, 'Peas': 4000,
+      'Cow Milk': 35, 'Buffalo Milk': 45, 'Goat Milk': 60 // per liter
     };
 
-    const price = pricePerQuintal[cropType] || 2000; // Default price if crop not found
-    return yield_ * price;
+    const basePrice = basePrices[cropType] || 2000;
+
+    // AI Rules for price prediction
+    let priceMultiplier = 1.0;
+
+    // Rule 1: Seasonal demand patterns
+    const seasonalFactors: Record<string, Record<number, number>> = {
+      'Rice': { 1: 1.1, 2: 1.15, 3: 1.2, 4: 0.85, 5: 0.9, 6: 0.95, 7: 1.0, 8: 1.05, 9: 1.1, 10: 0.8, 11: 0.9, 12: 1.0 },
+      'Wheat': { 1: 1.2, 2: 1.25, 3: 1.3, 4: 0.8, 5: 0.85, 6: 0.9, 7: 0.95, 8: 1.0, 9: 1.05, 10: 1.1, 11: 1.15, 12: 1.2 },
+      'Tomato': { 1: 1.3, 2: 1.4, 3: 0.7, 4: 0.6, 5: 0.8, 6: 0.9, 7: 1.1, 8: 1.2, 9: 1.3, 10: 0.8, 11: 1.2, 12: 1.4 },
+      'Onion': { 1: 1.4, 2: 1.5, 3: 1.2, 4: 0.9, 5: 0.8, 6: 0.7, 7: 0.8, 8: 0.9, 9: 1.0, 10: 1.1, 11: 0.9, 12: 1.3 },
+      'Mango': { 1: 0.0, 2: 0.0, 3: 0.5, 4: 1.2, 5: 1.0, 6: 0.8, 7: 0.3, 8: 0.0, 9: 0.0, 10: 0.0, 11: 0.0, 12: 0.0 },
+      'Potato': { 1: 1.2, 2: 1.3, 3: 0.8, 4: 0.7, 5: 0.8, 6: 0.9, 7: 1.0, 8: 1.1, 9: 1.2, 10: 1.3, 11: 0.9, 12: 1.1 },
+      'Cauliflower': { 1: 1.0, 2: 0.9, 3: 0.0, 4: 0.0, 5: 0.0, 6: 0.0, 7: 0.0, 8: 0.0, 9: 0.0, 10: 0.0, 11: 1.2, 12: 1.1 },
+      'Cabbage': { 1: 1.0, 2: 0.9, 3: 0.0, 4: 0.0, 5: 0.0, 6: 0.0, 7: 0.0, 8: 0.0, 9: 0.0, 10: 0.0, 11: 1.2, 12: 1.1 },
+      'Peas': { 1: 1.0, 2: 0.9, 3: 0.8, 4: 0.0, 5: 0.0, 6: 0.0, 7: 0.0, 8: 0.0, 9: 0.0, 10: 0.0, 11: 1.3, 12: 1.2 },
+      'Carrot': { 1: 1.0, 2: 0.9, 3: 0.0, 4: 0.0, 5: 0.0, 6: 0.0, 7: 0.0, 8: 0.0, 9: 0.0, 10: 0.0, 11: 1.2, 12: 1.1 }
+    };
+
+    const seasonalFactor = seasonalFactors[cropType]?.[month] || 1.0;
+    priceMultiplier *= seasonalFactor;
+
+    // Rule 2: Supply-demand based on farm size (market saturation)
+    if (landSize > 10) {
+      priceMultiplier *= 0.95; // Large farms may face lower prices due to bulk selling
+    } else if (landSize < 2) {
+      priceMultiplier *= 1.05; // Small farms may get premium prices in local markets
+    }
+
+    // Rule 3: Quality premium for organic/good practices
+    const qualityPremium = 1.08; // Assume 8% premium for good farming practices
+    priceMultiplier *= qualityPremium;
+
+    // Rule 4: Market volatility factor (random but controlled)
+    const volatilityFactor = 0.9 + (Math.random() * 0.2); // ±10% volatility
+    priceMultiplier *= volatilityFactor;
+
+    // Rule 5: Government MSP (Minimum Support Price) floor
+    const mspFloor = 0.85; // Never go below 85% of base price
+    priceMultiplier = Math.max(priceMultiplier, mspFloor);
+
+    return Math.round(basePrice * priceMultiplier);
+  };
+
+  const estimateCropIncome = (cropType: string, yield_: number, month: number = 6, landSize: number = 1) => {
+    const predictedPrice = getMarketPricePrediction(cropType, month, landSize);
+    return yield_ * predictedPrice;
+  };
+
+  // Helper functions for price analysis
+  const getMarketFactorsText = (cropType: string, month: number, landSize: number): string => {
+    const factors = [];
+
+    // Seasonal factor analysis
+    const seasonalFactors: Record<string, Record<number, number>> = {
+      'Rice': { 1: 1.1, 2: 1.15, 3: 1.2, 4: 0.85, 5: 0.9, 6: 0.95, 7: 1.0, 8: 1.05, 9: 1.1, 10: 0.8, 11: 0.9, 12: 1.0 },
+      'Wheat': { 1: 1.2, 2: 1.25, 3: 1.3, 4: 0.8, 5: 0.85, 6: 0.9, 7: 0.95, 8: 1.0, 9: 1.05, 10: 1.1, 11: 1.15, 12: 1.2 },
+      'Tomato': { 1: 1.3, 2: 1.4, 3: 0.7, 4: 0.6, 5: 0.8, 6: 0.9, 7: 1.1, 8: 1.2, 9: 1.3, 10: 0.8, 11: 1.2, 12: 1.4 },
+      'Onion': { 1: 1.4, 2: 1.5, 3: 1.2, 4: 0.9, 5: 0.8, 6: 0.7, 7: 0.8, 8: 0.9, 9: 1.0, 10: 1.1, 11: 0.9, 12: 1.3 },
+      'Mango': { 1: 0.0, 2: 0.0, 3: 0.5, 4: 1.2, 5: 1.0, 6: 0.8, 7: 0.3, 8: 0.0, 9: 0.0, 10: 0.0, 11: 0.0, 12: 0.0 },
+      'Potato': { 1: 1.2, 2: 1.3, 3: 0.8, 4: 0.7, 5: 0.8, 6: 0.9, 7: 1.0, 8: 1.1, 9: 1.2, 10: 1.3, 11: 0.9, 12: 1.1 },
+      'Cauliflower': { 1: 1.0, 2: 0.9, 3: 0.0, 4: 0.0, 5: 0.0, 6: 0.0, 7: 0.0, 8: 0.0, 9: 0.0, 10: 0.0, 11: 1.2, 12: 1.1 },
+      'Cabbage': { 1: 1.0, 2: 0.9, 3: 0.0, 4: 0.0, 5: 0.0, 6: 0.0, 7: 0.0, 8: 0.0, 9: 0.0, 10: 0.0, 11: 1.2, 12: 1.1 },
+      'Peas': { 1: 1.0, 2: 0.9, 3: 0.8, 4: 0.0, 5: 0.0, 6: 0.0, 7: 0.0, 8: 0.0, 9: 0.0, 10: 0.0, 11: 1.3, 12: 1.2 },
+      'Carrot': { 1: 1.0, 2: 0.9, 3: 0.0, 4: 0.0, 5: 0.0, 6: 0.0, 7: 0.0, 8: 0.0, 9: 0.0, 10: 0.0, 11: 1.2, 12: 1.1 }
+    };
+
+    const seasonalFactor = seasonalFactors[cropType]?.[month] || 1.0;
+    if (seasonalFactor > 1.1) {
+      factors.push('High seasonal demand');
+    } else if (seasonalFactor < 0.9) {
+      factors.push('Low seasonal demand');
+    } else {
+      factors.push('Normal seasonal demand');
+    }
+
+    // Farm size factor
+    if (landSize > 10) {
+      factors.push('Large farm (bulk pricing)');
+    } else if (landSize < 2) {
+      factors.push('Small farm (premium pricing)');
+    } else {
+      factors.push('Medium farm (standard pricing)');
+    }
+
+    // Quality premium
+    factors.push('Quality premium (+8%)');
+
+    // MSP protection
+    factors.push('MSP floor protection');
+
+    return factors.join(', ');
+  };
+
+  const getPriceRecommendation = (cropType: string, month: number, predictedPrice: number): string => {
+    const basePrices: Record<string, number> = {
+      'Rice': 2100, 'Wheat': 2250, 'Corn': 1850, 'Sugarcane': 380, 'Cotton': 6200,
+      'Soybean': 4600, 'Lentils (Dal)': 6500, 'Chickpea': 5800, 'Mustard': 5200,
+      'Groundnut': 5500, 'Sunflower': 6000,
+      'Mango': 3200, 'Banana': 1200, 'Apple': 8500, 'Orange': 2800, 'Grapes': 4500,
+      'Watermelon': 800, 'Papaya': 1500, 'Guava': 2000, 'Pomegranate': 6000, 'Pineapple': 2500,
+      'Potato': 1300, 'Tomato': 2800, 'Onion': 1600, 'Cabbage': 1000, 'Cauliflower': 1800,
+      'Brinjal': 2200, 'Okra': 3000, 'Spinach': 2500, 'Carrot': 2000, 'Peas': 4000
+    };
+
+    const basePrice = basePrices[cropType] || 2000;
+    const priceRatio = predictedPrice / basePrice;
+
+    if (priceRatio > 1.2) {
+      return 'Excellent pricing! Consider maximizing harvest quality for premium rates.';
+    } else if (priceRatio > 1.1) {
+      return 'Good pricing expected. Focus on timely harvest and proper storage.';
+    } else if (priceRatio < 0.9) {
+      return 'Lower prices expected. Consider value addition or direct marketing.';
+    } else {
+      return 'Average pricing expected. Maintain quality standards for best returns.';
+    }
+  };
+
+  const getPriceTrendAnalysis = (cropType: string, landSize: number): string => {
+    const analysis = [];
+
+    // Crop-specific analysis
+    if (['Tomato', 'Onion', 'Potato'].includes(cropType)) {
+      analysis.push('High price volatility crop - prices can vary significantly based on weather and supply.');
+    } else if (['Rice', 'Wheat'].includes(cropType)) {
+      analysis.push('Stable pricing with government support through MSP and procurement.');
+    } else if (['Mango', 'Apple', 'Grapes'].includes(cropType)) {
+      analysis.push('Premium fruit with export potential - focus on quality for better prices.');
+    }
+
+    // Farm size analysis
+    if (landSize > 10) {
+      analysis.push('Large farm advantage: Consider contract farming for price stability.');
+    } else if (landSize < 2) {
+      analysis.push('Small farm advantage: Direct marketing can yield 15-20% higher prices.');
+    }
+
+    // General market advice
+    analysis.push('Monitor market prices weekly and consider storage options during peak harvest.');
+
+    return analysis.join(' ');
   };
 
   const calculateExpenseCategories = () => {
     const categories: ExpenseCategory[] = [];
-    const monthlyExpense = planData.monthlyExpenses;
+
+    // Use AI predictions if available, otherwise fallback to old logic
+    if (planData.aiPredictions?.costOptimization) {
+      const costData = planData.aiPredictions.costOptimization;
+      const breakdown = costData.optimizedBreakdown;
+      const totalCost = costData.standardTotal;
+
+      categories.push(
+        {
+          name: 'Seeds',
+          percentage: Math.round((breakdown.seeds / totalCost) * 100),
+          amount: breakdown.seeds,
+          recommendation: 'Use certified seeds from government sources for better yield and disease resistance.'
+        },
+        {
+          name: 'Fertilizers',
+          percentage: Math.round((breakdown.fertilizer / totalCost) * 100),
+          amount: breakdown.fertilizer,
+          recommendation: 'Follow soil health card recommendations for optimal fertilizer use.'
+        },
+        {
+          name: 'Pesticides',
+          percentage: Math.round((breakdown.pesticide / totalCost) * 100),
+          amount: breakdown.pesticide,
+          recommendation: 'Use integrated pest management (IPM) to reduce pesticide dependency.'
+        },
+        {
+          name: 'Labor',
+          percentage: Math.round((breakdown.labor / totalCost) * 100),
+          amount: breakdown.labor,
+          recommendation: 'Consider mechanization for routine tasks to optimize labor costs.'
+        },
+        {
+          name: 'Others',
+          percentage: Math.round((breakdown.others / totalCost) * 100),
+          amount: breakdown.others,
+          recommendation: 'Track miscellaneous expenses to identify cost-saving opportunities.'
+        }
+      );
+
+      setExpenseCategories(categories);
+      return;
+    }
+
+    // Fallback to old logic
+    const monthlyExpense = planData.monthlyExpenses || planData.monthlyHouseholdExpenses || 0;
+    const farmingType = planData.farmingType || 'cereals';
 
     // Define expense categories based on farming type
-    if (planData.farmingType === 'crops') {
+    if (farmingType === 'crops' || farmingType === 'cereals') {
       categories.push(
         {
           name: 'Seeds',
@@ -221,7 +551,7 @@ const FinancialPlanViewScreen = () => {
           recommendation: 'Track miscellaneous expenses closely to identify cost-saving opportunities.'
         }
       );
-    } else if (planData.farmingType === 'fruits') {
+    } else if (farmingType === 'fruits' || farmingType === 'horticulture') {
       categories.push(
         {
           name: 'Saplings/Plants',
@@ -260,7 +590,7 @@ const FinancialPlanViewScreen = () => {
           recommendation: 'Consider investing in cold storage to extend shelf life and get better prices.'
         }
       );
-    } else if (planData.farmingType === 'vegetables') {
+    } else if (farmingType === 'vegetables') {
       categories.push(
         {
           name: 'Seeds/Seedlings',
@@ -299,7 +629,7 @@ const FinancialPlanViewScreen = () => {
           recommendation: 'Invest in proper packaging to reduce post-harvest losses.'
         }
       );
-    } else if (planData.farmingType === 'dairy') {
+    } else if (farmingType === 'dairy' || farmingType === 'dairy_livestock') {
       categories.push(
         {
           name: 'Feed',
@@ -428,9 +758,22 @@ const FinancialPlanViewScreen = () => {
       recs.push('Your financial plan shows decreasing savings. Review your income and expense projections.');
     }
 
-    // Add some general recommendations
-    recs.push('Consider government schemes and subsidies for farmers to reduce costs.');
-    recs.push('Explore crop insurance options to protect against yield losses.');
+    // Add government scheme recommendations
+    recs.push('Apply for PM-KISAN scheme for ₹6,000 annual income support.');
+    recs.push('Consider Pradhan Mantri Fasal Bima Yojana for crop insurance at subsidized rates.');
+    recs.push('Explore KCC (Kisan Credit Card) for easy access to credit at 4% interest.');
+    recs.push('Check eligibility for Interest Subvention Scheme for additional 3% interest reduction.');
+
+    if (planData.loanAmount > 0) {
+      recs.push('Your loan qualifies for subsidized interest rates under government schemes.');
+    }
+
+    // Add farming type specific government schemes
+    if (planData.farmingType === 'dairy') {
+      recs.push('Apply for National Livestock Mission for dairy development support.');
+    } else if (planData.farmingType === 'fruits' || planData.farmingType === 'vegetables') {
+      recs.push('Consider Mission for Integrated Development of Horticulture (MIDH) benefits.');
+    }
 
     setRecommendations(recs);
   };
@@ -475,17 +818,75 @@ const FinancialPlanViewScreen = () => {
             </Text>
           </View>
 
+          {/* Plan Viability Status */}
+          {planData.aiPredictions?.cashFlowProjection && (
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>Plan Status:</Text>
+              <Text style={[
+                styles.summaryValue,
+                {
+                  color: planData.aiPredictions.cashFlowProjection.isViable ? colors.success : colors.warning,
+                  fontWeight: 'bold'
+                }
+              ]}>
+                {planData.aiPredictions.cashFlowProjection.isViable ? '✅ Viable' : '⚠️ Needs Adjustment'}
+              </Text>
+            </View>
+          )}
+
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>Plan Duration:</Text>
-            <Text style={styles.summaryValue}>{planData.planDuration} months</Text>
+            <Text style={styles.summaryValue}>12 months (from today)</Text>
           </View>
+
+          {planData.loanAmount > 0 && (
+            <>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Loan Amount:</Text>
+                <Text style={styles.summaryValue}>₹{planData.loanAmount.toLocaleString()}</Text>
+              </View>
+
+              {planData.loanType && (
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Loan Type:</Text>
+                  <Text style={styles.summaryValue}>{planData.loanType}</Text>
+                </View>
+              )}
+
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Interest Rate:</Text>
+                <Text style={styles.summaryValue}>
+                  {planData.interestRate}% per annum {planData.customInterestRate ? '(Custom)' : '(Subsidized)'}
+                </Text>
+              </View>
+
+              {planData.loanDuration && (
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Loan Duration:</Text>
+                  <Text style={styles.summaryValue}>{planData.loanDuration} months</Text>
+                </View>
+              )}
+
+              {planData.monthlyLoanPayment && (
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Monthly EMI:</Text>
+                  <Text style={styles.summaryValue}>₹{planData.monthlyLoanPayment.toLocaleString()} (Fixed)</Text>
+                </View>
+              )}
+            </>
+          )}
         </Card>
 
         {/* Monthly Projections */}
         <Card style={styles.card}>
-          <Text style={styles.cardTitle}>Monthly Projections</Text>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Monthly Projections</Text>
+            <Text style={styles.cardSubtitle}>
+              Based on {planData.farmingType} farming with realistic harvest cycles
+            </Text>
+          </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.tableContainer}>
             <View>
               {/* Table Header */}
               <View style={styles.tableRow}>
@@ -493,44 +894,215 @@ const FinancialPlanViewScreen = () => {
                 <Text style={[styles.tableHeader, styles.amountCell]}>Income</Text>
                 <Text style={[styles.tableHeader, styles.amountCell]}>Expenses</Text>
                 <Text style={[styles.tableHeader, styles.amountCell]}>Cash Flow</Text>
-                <Text style={[styles.tableHeader, styles.amountCell]}>Savings</Text>
+                <Text style={[styles.tableHeader, styles.amountCell]}>Total Savings</Text>
                 {planData.loanAmount > 0 && (
                   <Text style={[styles.tableHeader, styles.amountCell]}>Loan Balance</Text>
                 )}
               </View>
 
               {/* Table Rows */}
-              {projections.map((projection, index) => (
-                <View key={index} style={[
-                  styles.tableRow,
-                  index % 2 === 0 ? styles.evenRow : styles.oddRow
-                ]}>
-                  <Text style={[styles.tableCell, styles.monthCell]}>{projection.month}</Text>
-                  <Text style={[styles.tableCell, styles.amountCell]}>
-                    ₹{projection.income.toLocaleString()}
-                  </Text>
-                  <Text style={[styles.tableCell, styles.amountCell]}>
-                    ₹{projection.expenses.toLocaleString()}
-                  </Text>
-                  <Text style={[
-                    styles.tableCell,
-                    styles.amountCell,
-                    { color: projection.cashFlow >= 0 ? colors.success : colors.error }
+              {projections.map((projection, index) => {
+                const isHarvestMonth = projection.income > (planData.monthlyIncome || planData.annualFarmIncome / 12 || 0);
+                const monthDisplay = projection.monthName ?
+                  projection.monthName.split(' ')[0].substring(0, 3) : // Show first 3 letters of month
+                  `Month ${projection.month}`;
+
+                return (
+                  <View key={index} style={[
+                    styles.tableRow,
+                    index % 2 === 0 ? styles.evenRow : styles.oddRow,
+                    isHarvestMonth && styles.harvestRow
                   ]}>
-                    ₹{projection.cashFlow.toLocaleString()}
-                  </Text>
-                  <Text style={[styles.tableCell, styles.amountCell]}>
-                    ₹{projection.savings.toLocaleString()}
-                  </Text>
-                  {planData.loanAmount > 0 && (
-                    <Text style={[styles.tableCell, styles.amountCell]}>
-                      ₹{projection.loanBalance.toLocaleString()}
+                    <View style={[styles.tableCell, styles.monthCell, styles.monthCellContainer]}>
+                      <Text style={styles.monthText}>{monthDisplay}</Text>
+                      {isHarvestMonth && (
+                        <Text style={styles.harvestIndicator}>🌾</Text>
+                      )}
+                    </View>
+
+                    <Text style={[
+                      styles.tableCell,
+                      styles.amountCell,
+                      isHarvestMonth && styles.harvestIncome
+                    ]}>
+                      ₹{projection.income.toLocaleString()}
                     </Text>
-                  )}
-                </View>
-              ))}
+
+                    <Text style={[styles.tableCell, styles.amountCell]}>
+                      ₹{projection.expenses.toLocaleString()}
+                    </Text>
+
+                    <Text style={[
+                      styles.tableCell,
+                      styles.amountCell,
+                      {
+                        color: projection.cashFlow >= 0 ? colors.success : colors.error,
+                        fontFamily: typography.fontFamily.bold
+                      }
+                    ]}>
+                      {projection.cashFlow >= 0 ? '+' : ''}₹{projection.cashFlow.toLocaleString()}
+                    </Text>
+
+                    <Text style={[
+                      styles.tableCell,
+                      styles.amountCell,
+                      {
+                        color: projection.savings >= planData.currentSavings ? colors.success : colors.warning,
+                        fontFamily: typography.fontFamily.medium
+                      }
+                    ]}>
+                      ₹{projection.savings.toLocaleString()}
+                    </Text>
+
+                    {planData.loanAmount > 0 && (
+                      <Text style={[
+                        styles.tableCell,
+                        styles.amountCell,
+                        { color: projection.loanBalance > 0 ? colors.warning : colors.success }
+                      ]}>
+                        ₹{projection.loanBalance.toLocaleString()}
+                      </Text>
+                    )}
+                  </View>
+                );
+              })}
             </View>
           </ScrollView>
+
+          {/* Legend */}
+          <View style={styles.legend}>
+            <View style={styles.legendItem}>
+              <Text style={styles.harvestIndicator}>🌾</Text>
+              <Text style={styles.legendText}>Harvest Month</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendColor, { backgroundColor: colors.success }]} />
+              <Text style={styles.legendText}>Positive Cash Flow</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendColor, { backgroundColor: colors.error }]} />
+              <Text style={styles.legendText}>Negative Cash Flow</Text>
+            </View>
+          </View>
+        </Card>
+
+        {/* Expected Harvest Prices */}
+        <Card style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>AI-Predicted Harvest Prices</Text>
+            <Text style={styles.cardSubtitle}>
+              Smart price predictions based on seasonal patterns, market conditions, and farm size
+            </Text>
+          </View>
+
+          {/* Use AI predictions if available, otherwise fallback to old logic */}
+          {planData.aiPredictions?.pricePrediction ? (
+            // AI-based price predictions
+            <>
+              {planData.aiPredictions.pricePrediction.monthlyPrices.map((priceData: any, index: number) => {
+                const monthName = new Date(2024, priceData.month - 1, 1).toLocaleString('default', { month: 'long' });
+                const isCurrentSeason = priceData.month >= new Date().getMonth() + 1;
+
+                return (
+                  <View key={index} style={styles.priceItem}>
+                    <View style={styles.priceHeader}>
+                      <Text style={styles.priceMonth}>{monthName} (Month {priceData.month})</Text>
+                      <View style={styles.priceContainer}>
+                        <Text style={styles.priceValue}>₹{priceData.price.toLocaleString()}</Text>
+                        <Text style={styles.priceUnit}>per quintal</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.priceDetails}>
+                      <View style={styles.priceFactors}>
+                        <Text style={styles.factorLabel}>AI Market Factors:</Text>
+                        {priceData.factors.map((factor: string, factorIndex: number) => (
+                          <Text key={factorIndex} style={styles.factorText}>• {factor}</Text>
+                        ))}
+                      </View>
+
+                      <View style={styles.priceRecommendation}>
+                        <Ionicons name="bulb-outline" size={16} color={colors.primary} />
+                        <Text style={styles.recommendationText}>
+                          {planData.aiPredictions.pricePrediction.recommendation}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {isCurrentSeason && (
+                      <View style={styles.seasonBadge}>
+                        <Text style={styles.seasonBadgeText}>Current Season</Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+
+              {/* AI Price Trend Analysis */}
+              <View style={styles.priceTrend}>
+                <Text style={styles.trendTitle}>AI Price Trend Analysis</Text>
+                <Text style={styles.trendText}>
+                  Average Price: ₹{planData.aiPredictions.pricePrediction.averagePrice}/quintal |
+                  Volatility: {planData.aiPredictions.pricePrediction.volatility} |
+                  MSP Rate: ₹{planData.aiPredictions.pricePrediction.mspRate}/quintal
+                </Text>
+                <Text style={styles.trendText}>
+                  {planData.aiPredictions.pricePrediction.recommendation}
+                </Text>
+              </View>
+            </>
+          ) : (
+            // Fallback to old price prediction logic
+            <>
+              {getHarvestSchedule(planData.farmingType, planData.primaryCrop || planData.cropType).map((month, index) => {
+                const predictedPrice = getMarketPricePrediction(planData.primaryCrop || planData.cropType, month, planData.landSize);
+                const monthName = new Date(2024, month - 1, 1).toLocaleString('default', { month: 'long' });
+                const isCurrentSeason = month >= new Date().getMonth() + 1;
+
+                return (
+                  <View key={index} style={styles.priceItem}>
+                    <View style={styles.priceHeader}>
+                      <Text style={styles.priceMonth}>{monthName} (Month {month})</Text>
+                      <View style={styles.priceContainer}>
+                        <Text style={styles.priceValue}>₹{predictedPrice.toLocaleString()}</Text>
+                        <Text style={styles.priceUnit}>per quintal</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.priceDetails}>
+                      <View style={styles.priceFactors}>
+                        <Text style={styles.factorLabel}>Market Factors:</Text>
+                        <Text style={styles.factorText}>
+                          {getMarketFactorsText(planData.primaryCrop || planData.cropType, month, planData.landSize)}
+                        </Text>
+                      </View>
+
+                      <View style={styles.priceRecommendation}>
+                        <Ionicons name="bulb-outline" size={16} color={colors.primary} />
+                        <Text style={styles.recommendationText}>
+                          {getPriceRecommendation(planData.primaryCrop || planData.cropType, month, predictedPrice)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {isCurrentSeason && (
+                      <View style={styles.seasonBadge}>
+                        <Text style={styles.seasonBadgeText}>Current Season</Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+
+              {/* Overall price trend */}
+              <View style={styles.priceTrend}>
+                <Text style={styles.trendTitle}>Price Trend Analysis</Text>
+                <Text style={styles.trendText}>
+                  {getPriceTrendAnalysis(planData.primaryCrop || planData.cropType, planData.landSize)}
+                </Text>
+              </View>
+            </>
+          )}
         </Card>
 
         {/* Expected Expenses by Category */}
@@ -577,6 +1149,28 @@ const FinancialPlanViewScreen = () => {
             </View>
           ))}
         </Card>
+
+        {/* AI Cash Flow Recommendations */}
+        {planData.aiPredictions?.cashFlowProjection?.recommendations && (
+          <Card style={styles.card}>
+            <Text style={styles.cardTitle}>AI Cash Flow Analysis</Text>
+            <Text style={styles.cardSubtitle}>
+              Smart recommendations based on your income vs expenses analysis
+            </Text>
+
+            {planData.aiPredictions.cashFlowProjection.recommendations.map((recommendation: string, index: number) => (
+              <View key={index} style={styles.recommendationItem}>
+                <Ionicons
+                  name={recommendation.includes('deficit') ? "warning-outline" : "checkmark-circle"}
+                  size={20}
+                  color={recommendation.includes('deficit') ? colors.warning : colors.success}
+                  style={styles.recommendationIcon}
+                />
+                <Text style={styles.recommendationText}>{recommendation}</Text>
+              </View>
+            ))}
+          </Card>
+        )}
 
         {/* General Recommendations */}
         <Card style={styles.card}>
@@ -629,11 +1223,14 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.md,
   },
+  cardHeader: {
+    marginBottom: spacing.sm,
+  },
   cardTitle: {
     fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily.semiBold,
     color: colors.textPrimary,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
   cardSubtitle: {
     fontSize: typography.fontSize.sm,
@@ -691,6 +1288,56 @@ const styles = StyleSheet.create({
   },
   oddRow: {
     backgroundColor: colors.background,
+  },
+  // Enhanced table styles
+  tableContainer: {
+    marginVertical: spacing.sm,
+  },
+  harvestRow: {
+    backgroundColor: '#f0f8e8', // Light green background for harvest months
+  },
+  monthCellContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthText: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textPrimary,
+  },
+  harvestIndicator: {
+    fontSize: 12,
+    marginLeft: spacing.xs,
+  },
+  harvestIncome: {
+    fontFamily: typography.fontFamily.bold,
+    color: colors.success,
+  },
+  // Legend styles
+  legend: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.lightGray,
+    marginTop: spacing.sm,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  legendColor: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: spacing.xs,
+  },
+  legendText: {
+    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textSecondary,
+    marginLeft: spacing.xs,
   },
   recommendationItem: {
     flexDirection: 'row',
@@ -756,6 +1403,96 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontStyle: 'italic',
     width: '75%',
+  },
+  // Price prediction styles
+  priceItem: {
+    marginBottom: spacing.md,
+    padding: spacing.sm,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
+  },
+  priceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  priceMonth: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.textPrimary,
+  },
+  priceContainer: {
+    alignItems: 'flex-end',
+  },
+  priceValue: {
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.success,
+  },
+  priceUnit: {
+    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textSecondary,
+  },
+  priceDetails: {
+    marginTop: spacing.sm,
+  },
+  priceFactors: {
+    marginBottom: spacing.sm,
+  },
+  factorLabel: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  factorText: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textPrimary,
+    lineHeight: 18,
+  },
+  priceRecommendation: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: colors.primaryLight,
+    padding: spacing.sm,
+    borderRadius: borderRadius.xs,
+  },
+  seasonBadge: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+  },
+  seasonBadgeText: {
+    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.white,
+  },
+  priceTrend: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.sm,
+  },
+  trendTitle: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  trendText: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textPrimary,
+    lineHeight: 20,
   },
 });
 

@@ -120,46 +120,27 @@ const ContractManagementScreen = () => {
     }
   };
 
-  // Configure tabs with counts
+  // Configure tabs without badge counts for a cleaner interface
   const tabs = useMemo<TabItem[]>(() => {
     return [
       {
         key: 'all',
-        title: 'All',
-        badge: contracts.length,
+        title: 'All Contracts',
       },
       {
         key: 'active',
         title: 'Active',
-        badge: contracts.filter(contract => contract.status === 'active').length,
-        badgeColor: colors.success,
       },
       {
         key: 'tenders',
         title: 'Tenders',
         icon: 'megaphone',
-        badge: contracts.filter(contract => contract.isTender).length,
-        badgeColor: colors.accent,
       },
       {
         key: 'farming',
         title: 'Farming',
         icon: 'leaf',
-        badge: contracts.filter(contract => contract.type === 'farming').length,
-        badgeColor: '#4CAF50',
-      },
-      {
-        key: 'pending',
-        title: 'Pending',
-        badge: contracts.filter(contract => contract.status === 'pending').length,
-        badgeColor: colors.warning,
-      },
-      {
-        key: 'completed',
-        title: 'Completed',
-        badge: contracts.filter(contract => contract.status === 'completed').length,
-        badgeColor: colors.primary,
-      },
+      }
     ];
   }, [contracts]);
 
@@ -197,7 +178,7 @@ const ContractManagementScreen = () => {
     }
   };
 
-  // Render a contract item
+  // Render a contract item - simplified for better readability
   const renderContractItem = ({ item }: { item: Contract }) => {
     // Determine if the current user is the first or second party
     const isFirstParty = userProfile && item.parties.firstPartyId === userProfile.uid;
@@ -216,8 +197,36 @@ const ContractManagementScreen = () => {
           ? 'Open for Bids'
           : 'Not Specified';
 
+    // Create a single badges array to display all relevant badges
+    const badges = [];
+
+    if (item.isTender) {
+      badges.push({
+        icon: 'megaphone',
+        text: 'Tender',
+        color: colors.accent
+      });
+    }
+
+    if (item.type === 'farming') {
+      badges.push({
+        icon: 'leaf',
+        text: 'Farming',
+        color: colors.primary
+      });
+    }
+
+    if (item.structuredBidding?.isEnabled) {
+      badges.push({
+        icon: 'list',
+        text: 'Structured Bidding',
+        color: colors.secondary
+      });
+    }
+
     return (
       <Card style={styles.contractCard}>
+        {/* Contract Header with Title and Status */}
         <View style={styles.contractHeader}>
           <View style={styles.contractTitleContainer}>
             <Ionicons
@@ -241,27 +250,22 @@ const ContractManagementScreen = () => {
           </View>
         </View>
 
-        {item.isTender && (
-          <View style={styles.tenderBadge}>
-            <Ionicons name="megaphone" size={16} color={colors.white} />
-            <Text style={styles.tenderText}>Tender</Text>
+        {/* Badges Section - consolidated in one place */}
+        {badges.length > 0 && (
+          <View style={styles.badgesContainer}>
+            {badges.map((badge, index) => (
+              <View
+                key={index}
+                style={[styles.badge, { backgroundColor: badge.color }]}
+              >
+                <Ionicons name={badge.icon} size={14} color={colors.white} />
+                <Text style={styles.badgeText}>{badge.text}</Text>
+              </View>
+            ))}
           </View>
         )}
 
-        {item.type === 'farming' && (
-          <View style={styles.farmingBadge}>
-            <Ionicons name="leaf" size={16} color={colors.white} />
-            <Text style={styles.farmingText}>Farming Contract</Text>
-          </View>
-        )}
-
-        {item.structuredBidding?.isEnabled && (
-          <View style={[styles.structuredBidBadge, item.type === 'farming' ? { top: 70 } : { top: 40 }]}>
-            <Ionicons name="list" size={16} color={colors.white} />
-            <Text style={styles.structuredBidText}>Structured Bidding</Text>
-          </View>
-        )}
-
+        {/* Essential Contract Details */}
         <View style={styles.contractDetails}>
           <View style={styles.contractDetailRow}>
             <Text style={styles.contractDetailLabel}>Parties:</Text>
@@ -298,73 +302,13 @@ const ContractManagementScreen = () => {
               {formatCurrency(item.value)}
             </Text>
           </View>
-
-          <View style={styles.contractDescription}>
-            <Text style={styles.contractDescriptionText}>{item.description}</Text>
-          </View>
-
-          {/* Farming Contract Details */}
-          {item.type === 'farming' && item.farmingDetails && (
-            <View style={styles.farmingDetails}>
-              <Text style={styles.farmingDetailsTitle}>Farming Details:</Text>
-              <View style={styles.farmingDetailsRow}>
-                <Text style={styles.farmingDetailsLabel}>Crop:</Text>
-                <Text style={styles.farmingDetailsValue}>{item.farmingDetails.cropType}</Text>
-              </View>
-              <View style={styles.farmingDetailsRow}>
-                <Text style={styles.farmingDetailsLabel}>Area:</Text>
-                <Text style={styles.farmingDetailsValue}>
-                  {item.farmingDetails.landArea} {item.farmingDetails.landAreaUnit}
-                </Text>
-              </View>
-              <View style={styles.farmingDetailsRow}>
-                <Text style={styles.farmingDetailsLabel}>Expected Yield:</Text>
-                <Text style={styles.farmingDetailsValue}>
-                  {item.farmingDetails.expectedYield} {item.farmingDetails.yieldUnit}
-                </Text>
-              </View>
-              <View style={styles.farmingDetailsRow}>
-                <Text style={styles.farmingDetailsLabel}>Support:</Text>
-                <View style={styles.farmingSupport}>
-                  {item.farmingDetails.seedProvision && (
-                    <View style={styles.supportItem}>
-                      <Ionicons name="checkmark-circle" size={14} color={colors.success} />
-                      <Text style={styles.supportText}>Seeds</Text>
-                    </View>
-                  )}
-                  {item.farmingDetails.inputProvision && (
-                    <View style={styles.supportItem}>
-                      <Ionicons name="checkmark-circle" size={14} color={colors.success} />
-                      <Text style={styles.supportText}>Inputs</Text>
-                    </View>
-                  )}
-                  {item.farmingDetails.harvestingSupport && (
-                    <View style={styles.supportItem}>
-                      <Ionicons name="checkmark-circle" size={14} color={colors.success} />
-                      <Text style={styles.supportText}>Harvesting</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* Structured Bidding Details */}
-          {item.structuredBidding?.isEnabled && (
-            <View style={styles.structuredBiddingDetails}>
-              <Text style={styles.structuredBiddingTitle}>Structured Bidding Enabled</Text>
-              <Text style={styles.structuredBiddingText}>
-                This contract uses structured bidding with {item.structuredBidding.bidParameters.length} parameters
-                for transparent and fair evaluation.
-              </Text>
-            </View>
-          )}
         </View>
 
+        {/* Contract Actions */}
         <View style={styles.contractActions}>
           <Button
             title="View Details"
-            variant="outline"
+            variant="solid"
             size="small"
             onPress={() => {
               // @ts-ignore - Ignore the type error for navigation
@@ -375,9 +319,10 @@ const ContractManagementScreen = () => {
 
           {item.documents && item.documents.length > 0 && (
             <Button
-              title="View Documents"
+              title="Documents"
               variant="outline"
               size="small"
+              icon="document-text-outline"
               onPress={() => {
                 // @ts-ignore - Ignore the type error for navigation
                 navigation.navigate('DocumentViewer', { documentIds: item.documents });
@@ -427,8 +372,9 @@ const ContractManagementScreen = () => {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         style={styles.tabsContainer}
-        scrollable={true}
-        showBadges={true}
+        scrollable={false}
+        equalWidth={true}
+        showBadges={false}
       />
 
       {getFilteredContracts().length > 0 ? (
@@ -531,12 +477,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderBottomWidth: 1,
     borderBottomColor: colors.lightGray,
-    elevation: 2,
+    elevation: 1,
     shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 1,
     zIndex: 10,
+    marginBottom: spacing.sm,
   },
   contractsList: {
     padding: spacing.md,
@@ -544,17 +491,21 @@ const styles = StyleSheet.create({
   contractCard: {
     marginBottom: spacing.md,
     borderRadius: borderRadius.lg,
-    elevation: 3,
+    elevation: 2,
     shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 2,
+    padding: spacing.sm, // Add padding to the card for better spacing
   },
   contractHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.md,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.veryLightGray,
   },
   contractTitleContainer: {
     flexDirection: 'row',
@@ -580,49 +531,21 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.medium,
     color: colors.white,
   },
-  tenderBadge: {
+  badgesContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.accent,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-    alignSelf: 'flex-start',
+    flexWrap: 'wrap',
     marginBottom: spacing.md,
   },
-  tenderText: {
-    fontSize: typography.fontSize.xs,
-    fontFamily: typography.fontFamily.medium,
-    color: colors.white,
-    marginLeft: spacing.xs,
-  },
-  farmingBadge: {
+  badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4CAF50',
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.sm,
-    alignSelf: 'flex-start',
-    marginBottom: spacing.md,
+    marginRight: spacing.sm,
+    marginBottom: spacing.xs,
   },
-  farmingText: {
-    fontSize: typography.fontSize.xs,
-    fontFamily: typography.fontFamily.medium,
-    color: colors.white,
-    marginLeft: spacing.xs,
-  },
-  structuredBidBadge: {
-    position: 'absolute',
-    right: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.secondary,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-  },
-  structuredBidText: {
+  badgeText: {
     fontSize: typography.fontSize.xs,
     fontFamily: typography.fontFamily.medium,
     color: colors.white,
@@ -630,10 +553,13 @@ const styles = StyleSheet.create({
   },
   contractDetails: {
     marginBottom: spacing.md,
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
   },
   contractDetailRow: {
     flexDirection: 'row',
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
   },
   contractDetailLabel: {
     width: 80,
@@ -669,91 +595,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#FFFFFF',
   },
-  contractDescription: {
-    backgroundColor: colors.surfaceLight,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginTop: spacing.sm,
-  },
-  contractDescriptionText: {
-    fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.regular,
-    color: colors.textPrimary,
-  },
-  farmingDetails: {
-    backgroundColor: colors.surfaceLight,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginTop: spacing.sm,
-  },
-  farmingDetailsTitle: {
-    fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.bold,
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-  },
-  farmingDetailsRow: {
-    flexDirection: 'row',
-    marginBottom: spacing.xs,
-  },
-  farmingDetailsLabel: {
-    width: 120,
-    fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.medium,
-    color: colors.textSecondary,
-  },
-  farmingDetailsValue: {
-    flex: 1,
-    fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.regular,
-    color: colors.textPrimary,
-  },
-  farmingSupport: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  supportItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceLight,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-    marginRight: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  supportText: {
-    fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.medium,
-    color: colors.textPrimary,
-    marginLeft: spacing.xs,
-  },
-  structuredBiddingDetails: {
-    backgroundColor: colors.surfaceLight,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginTop: spacing.sm,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.secondary,
-  },
-  structuredBiddingTitle: {
-    fontSize: typography.fontSize.md,
-    fontFamily: typography.fontFamily.bold,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  structuredBiddingText: {
-    fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.regular,
-    color: colors.textSecondary,
-  },
+
   contractActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: spacing.md,
   },
   contractActionButton: {
     flex: 1,
     marginHorizontal: spacing.xs,
+    borderRadius: borderRadius.md,
   },
   emptyContainer: {
     flex: 1,

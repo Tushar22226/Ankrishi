@@ -3,13 +3,18 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { View, Text } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useOrderNotification } from '../context/OrderNotificationContext';
 
 // Auth Screens
 import SplashScreen from '../screens/auth/SplashScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import SignupScreen from '../screens/auth/SignupScreen';
 import ProfileSetupScreen from '../screens/auth/ProfileSetupScreen';
+
+// Delivery Screens
+import DeliveryManagementScreen from '../screens/delivery/DeliveryManagementScreen';
 
 // Main Screens
 import HomeScreen from '../screens/main/HomeScreen';
@@ -32,6 +37,12 @@ import FertilizerScreen from '../screens/marketplace/FertilizerScreen';
 import EquipmentRentalScreen from '../screens/marketplace/EquipmentRentalScreen';
 import ProduceScreen from '../screens/marketplace/ProduceScreen';
 import AddProductScreen from '../screens/marketplace/AddProductScreen';
+import AddPrelistedProductScreen from '../screens/marketplace/AddPrelistedProductScreen';
+import AddRequirementScreen from '../screens/marketplace/AddRequirementScreen';
+import RequirementsScreen from '../screens/marketplace/RequirementsScreen';
+import RequirementDetailsScreen from '../screens/marketplace/RequirementDetailsScreen';
+import RequirementManagementScreen from '../screens/marketplace/RequirementManagementScreen';
+import YourRequirementsScreen from '../screens/marketplace/YourRequirementsScreen';
 import EditProductScreen from '../screens/marketplace/EditProductScreen';
 import ProductDetailsScreen from '../screens/marketplace/ProductDetailsScreen';
 import OrderTrackingScreen from '../screens/marketplace/OrderTrackingScreen';
@@ -39,8 +50,15 @@ import OrderManagementScreen from '../screens/marketplace/OrderManagementScreen'
 import FarmerStorefrontScreen from '../screens/marketplace/FarmerStorefrontScreen';
 import NearbyFarmersScreen from '../screens/marketplace/NearbyFarmersScreen';
 import DirectCheckoutScreen from '../screens/marketplace/DirectCheckoutScreen';
+import MultiProductCheckoutScreen from '../screens/marketplace/MultiProductCheckoutScreen';
 import UserProductsScreen from '../screens/marketplace/UserProductsScreen';
 import CartScreen from '../screens/marketplace/CartScreen';
+import PrelistedMarketplaceScreen from '../screens/marketplace/PrelistedMarketplaceScreen';
+import PrelistedOrdersScreen from '../screens/marketplace/PrelistedOrdersScreen';
+import ViewPrelistedProductsScreen from '../screens/marketplace/ViewPrelistedProductsScreen';
+import OrderSuccessScreen from '../screens/marketplace/OrderSuccessScreen';
+import AddAddressScreen from '../screens/marketplace/AddAddressScreen';
+import UnderMaintenanceScreen from '../screens/common/UnderMaintenanceScreen';
 
 // Farm Management Screens
 import ExpenseTrackerScreen from '../screens/farm/ExpenseTrackerScreen';
@@ -63,6 +81,7 @@ import ImprovedSensorDataReportViewScreen from '../screens/ai/ImprovedSensorData
 // Document Screens
 import LeaseManagementScreen from '../screens/documents/LeaseManagementScreen';
 import DocumentManagementScreen from '../screens/documents/DocumentManagementScreen';
+// AddDocumentScreen removed as per requirements
 import ContractManagementScreen from '../screens/documents/ContractManagementScreen';
 import AddContractScreen from '../screens/documents/AddContractScreen';
 import ContractDetailsScreen from '../screens/documents/ContractDetailsScreen';
@@ -70,7 +89,6 @@ import ContractDetailsManagementScreen from '../screens/documents/ContractDetail
 import FarmBuySellScreen from '../screens/documents/FarmBuySellScreen';
 
 // Government Schemes Screens
-import ViewSchemesScreen from '../screens/schemes/ViewSchemesScreen';
 import ApplySchemesScreen from '../screens/schemes/ApplySchemesScreen';
 
 // Support Screens
@@ -86,6 +104,12 @@ import FarmerNetworkScreen from '../screens/community/FarmerNetworkScreen';
 import GroupDetailsScreen from '../screens/community/GroupDetailsScreen';
 import SchemeNavigatorScreen from '../screens/schemes/SchemeNavigatorScreen';
 
+// Wallet Screens
+import ShowAllTransactionScreen from '../screens/wallet/ShowAllTransactionScreen';
+import AddBalanceScreen from '../screens/wallet/AddBalanceScreen';
+import WithdrawMoneyScreen from '../screens/wallet/WithdrawMoneyScreen';
+import EarningsScreen from '../screens/wallet/EarningsScreen';
+
 // Chat Screens
 import ChatScreen from '../screens/chat/ChatScreen';
 import ChatListScreen from '../screens/chat/ChatListScreen';
@@ -97,6 +121,7 @@ import DebtManagementScreen from '../screens/finance/DebtManagementScreen';
 import SavingsScreen from '../screens/finance/SavingsScreen';
 import FinancialPlanningScreen from '../screens/finance/FinancialPlanningScreen';
 import DetailedReportScreen from '../screens/finance/DetailedReportScreen';
+import SideIncomeScreen from '../screens/finance/SideIncomeScreen';
 
 // Define stack navigators
 const AuthStack = createNativeStackNavigator();
@@ -116,6 +141,7 @@ const AuthNavigator = () => (
     <AuthStack.Screen name="Login" component={LoginScreen} />
     <AuthStack.Screen name="Signup" component={SignupScreen} />
     <AuthStack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
+    <AuthStack.Screen name="DeliveryManagement" component={DeliveryManagementScreen} />
   </AuthStack.Navigator>
 );
 
@@ -131,6 +157,12 @@ const HomeStackNavigator = () => (
     <HomeStack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
     <HomeStack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
     <HomeStack.Screen name="AppGuide" component={AppGuideScreen} options={{ headerShown: false }} />
+
+    {/* Wallet Screens */}
+    <HomeStack.Screen name="ShowAllTransaction" component={ShowAllTransactionScreen} options={{ headerShown: false }} />
+    <HomeStack.Screen name="AddBalance" component={AddBalanceScreen} options={{ headerShown: false }} />
+    <HomeStack.Screen name="WithdrawMoney" component={WithdrawMoneyScreen} options={{ headerShown: false }} />
+    <HomeStack.Screen name="Earnings" component={EarningsScreen} options={{ headerShown: false }} />
 
     {/* Verification Screens */}
     <HomeStack.Screen name="VerifyProfile" component={VerifyProfileScreen} options={{ headerShown: false }} />
@@ -161,6 +193,7 @@ const HomeStackNavigator = () => (
     <HomeStack.Screen name="Savings" component={SavingsScreen} options={{ headerShown: false }} />
     <HomeStack.Screen name="FinancialPlanning" component={FinancialPlanningScreen} options={{ headerShown: false }} />
     <HomeStack.Screen name="DetailedReport" component={DetailedReportScreen} options={{ headerShown: false }} />
+    <HomeStack.Screen name="SideIncome" component={SideIncomeScreen} options={{ headerShown: false }} />
 
     {/* Existing Screens */}
     <HomeStack.Screen name="Forecast" component={ForecastScreen} />
@@ -171,12 +204,12 @@ const HomeStackNavigator = () => (
     <HomeStack.Screen name="SensorDataReportView" component={ImprovedSensorDataReportViewScreen} options={{ headerShown: false }} />
     <HomeStack.Screen name="LeaseManagement" component={LeaseManagementScreen} />
     <HomeStack.Screen name="DocumentManagement" component={DocumentManagementScreen} />
+    {/* AddDocumentScreen removed as per requirements */}
     <HomeStack.Screen name="ContractManagement" component={ContractManagementScreen} options={{ headerShown: false }} />
     <HomeStack.Screen name="AddContract" component={AddContractScreen} options={{ headerShown: false }} />
     <HomeStack.Screen name="ContractDetails" component={ContractDetailsScreen} options={{ headerShown: false }} />
     <HomeStack.Screen name="ContractDetailsManagement" component={ContractDetailsManagementScreen} options={{ headerShown: false }} />
     <HomeStack.Screen name="FarmBuySell" component={FarmBuySellScreen} />
-    <HomeStack.Screen name="ViewSchemes" component={ViewSchemesScreen} />
     <HomeStack.Screen name="ApplySchemes" component={ApplySchemesScreen} />
   </HomeStack.Navigator>
 );
@@ -205,15 +238,27 @@ const MarketplaceStackNavigator = () => (
     <MarketplaceStack.Screen name="EquipmentRental" component={EquipmentRentalScreen} />
     <MarketplaceStack.Screen name="Produce" component={ProduceScreen} />
     <MarketplaceStack.Screen name="AddProduct" component={AddProductScreen} />
+    <MarketplaceStack.Screen name="AddRequirement" component={AddRequirementScreen} />
+    <MarketplaceStack.Screen name="Requirements" component={RequirementsScreen} />
+    <MarketplaceStack.Screen name="RequirementDetails" component={RequirementDetailsScreen} />
+    <MarketplaceStack.Screen name="RequirementManagement" component={RequirementManagementScreen} />
+    <MarketplaceStack.Screen name="YourRequirements" component={YourRequirementsScreen} />
+    <MarketplaceStack.Screen name="AddPrelistedProduct" component={AddPrelistedProductScreen} />
     <MarketplaceStack.Screen name="EditProduct" component={EditProductScreen} options={{ headerShown: false }} />
     <MarketplaceStack.Screen name="ProductDetails" component={ProductDetailsScreen} options={{ headerShown: false }} />
     <MarketplaceStack.Screen name="OrderTracking" component={OrderTrackingScreen} />
     <MarketplaceStack.Screen name="OrderManagement" component={OrderManagementScreen} options={{ headerShown: false }} />
+    <MarketplaceStack.Screen name="Orders" component={OrdersScreen} />
     <MarketplaceStack.Screen name="FarmerStorefront" component={FarmerStorefrontScreen} options={{ headerShown: false }} />
     <MarketplaceStack.Screen name="NearbyFarmers" component={NearbyFarmersScreen} options={{ headerShown: false }} />
     <MarketplaceStack.Screen name="DirectCheckout" component={DirectCheckoutScreen} options={{ headerShown: false }} />
+    <MarketplaceStack.Screen name="MultiProductCheckout" component={MultiProductCheckoutScreen} options={{ headerShown: false }} />
     <MarketplaceStack.Screen name="UserProducts" component={UserProductsScreen} options={{ headerShown: false }} />
     <MarketplaceStack.Screen name="Cart" component={CartScreen} options={{ headerShown: false }} />
+    <MarketplaceStack.Screen name="PrelistedMarketplace" component={PrelistedMarketplaceScreen} options={{ headerShown: false }} />
+    <MarketplaceStack.Screen name="ViewPrelistedProducts" component={ViewPrelistedProductsScreen} options={{ headerShown: false }} />
+    <MarketplaceStack.Screen name="OrderSuccess" component={OrderSuccessScreen} options={{ headerShown: false }} />
+    <MarketplaceStack.Screen name="AddAddress" component={AddAddressScreen} options={{ headerShown: false }} />
   </MarketplaceStack.Navigator>
 );
 
@@ -235,21 +280,88 @@ const ChatbotStackNavigator = () => (
   </ChatbotStack.Navigator>
 );
 
+// Import farm management screens
+import FarmMapScreen from '../screens/farm/FarmMapScreen';
+import CropManagementScreen from '../screens/farm/CropManagementScreen';
+import CropDetailsScreen from '../screens/farm/CropDetailsScreen';
+import AddCropScreen from '../screens/farm/AddCropScreen';
+import TaskManagementScreen from '../screens/farm/TaskManagementScreen';
+import AddTaskScreen from '../screens/farm/AddTaskScreen';
+import EditFarmScreen from '../screens/farm/EditFarmScreen';
+import SoilTestScreen from '../screens/farm/SoilTestScreen';
+import WeatherForecastScreen from '../screens/farm/WeatherForecastScreen';
+import EquipmentDetailsScreen from '../screens/farm/EquipmentDetailsScreen';
+
 // My Farm Stack Navigator
-const MyFarmStackNavigator = () => (
-  <MyFarmStack.Navigator>
-    <MyFarmStack.Screen name="MyFarmMain" component={MyFarmScreen} options={{ headerShown: false }} />
-    <MyFarmStack.Screen name="ExpenseTracker" component={ExpenseTrackerScreen} />
-    <MyFarmStack.Screen name="AddIncome" component={AddIncomeScreen} />
-    <MyFarmStack.Screen name="AddExpense" component={AddExpenseScreen} />
-    <MyFarmStack.Screen name="Reports" component={ReportsScreen} />
-    <MyFarmStack.Screen name="Orders" component={OrdersScreen} />
+const MyFarmStackNavigator = () => {
+  return (
+    <MyFarmStack.Navigator
+      screenOptions={{
+        headerShown: true,
+        headerStyle: {
+          backgroundColor: '#4CAF50',
+        },
+        headerTintColor: '#fff',
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+      }}
+    >
+      <MyFarmStack.Screen
+        name="MyFarmMain"
+        component={MyFarmScreen}
+        options={{
+          headerShown: false,
+          title: 'My Farm'
+        }}
+      />
+    <MyFarmStack.Screen
+      name="ExpenseTracker"
+      component={ExpenseTrackerScreen}
+      options={{ title: 'Expense Tracker' }}
+    />
+    <MyFarmStack.Screen
+      name="AddIncome"
+      component={AddIncomeScreen}
+      options={{ title: 'Add Income' }}
+    />
+    <MyFarmStack.Screen
+      name="AddExpense"
+      component={AddExpenseScreen}
+      options={{ title: 'Add Expense' }}
+    />
+    <MyFarmStack.Screen
+      name="Reports"
+      component={ReportsScreen}
+      options={{ title: 'Reports' }}
+    />
+    <MyFarmStack.Screen
+      name="Orders"
+      component={OrdersScreen}
+      options={{ title: 'Orders' }}
+    />
     <MyFarmStack.Screen name="DetailedReport" component={DetailedReportScreen} options={{ headerShown: false }} />
+    <MyFarmStack.Screen name="PrelistedProducts" component={PrelistedMarketplaceScreen} options={{ headerShown: false }} />
+    <MyFarmStack.Screen name="PrelistedOrders" component={PrelistedOrdersScreen} options={{ headerShown: false }} />
+    <MyFarmStack.Screen name="AddPrelistedProduct" component={AddPrelistedProductScreen} options={{ headerShown: false }} />
     <MyFarmStack.Screen name="IncomeBreakdown" component={IncomeBreakdownScreen} options={{ headerShown: false }} />
     <MyFarmStack.Screen name="ExpenseBreakdown" component={ExpenseBreakdownScreen} options={{ headerShown: false }} />
     <MyFarmStack.Screen name="Warehouse" component={WarehouseScreen} options={{ headerShown: false }} />
-  </MyFarmStack.Navigator>
-);
+
+    {/* Farm Management Screens */}
+    <MyFarmStack.Screen name="FarmMap" component={FarmMapScreen} options={{ headerShown: false }} />
+    <MyFarmStack.Screen name="CropManagement" component={CropManagementScreen} options={{ headerShown: false }} />
+    <MyFarmStack.Screen name="CropDetails" component={CropDetailsScreen} options={{ headerShown: false }} />
+    <MyFarmStack.Screen name="AddCrop" component={AddCropScreen} options={{ headerShown: false }} />
+    <MyFarmStack.Screen name="TaskManagement" component={TaskManagementScreen} options={{ headerShown: false }} />
+    <MyFarmStack.Screen name="AddTask" component={AddTaskScreen} options={{ headerShown: false }} />
+    <MyFarmStack.Screen name="EditFarm" component={EditFarmScreen} options={{ headerShown: false }} />
+    <MyFarmStack.Screen name="SoilTest" component={SoilTestScreen} options={{ headerShown: false }} />
+    <MyFarmStack.Screen name="WeatherForecast" component={WeatherForecastScreen} options={{ headerShown: false }} />
+    <MyFarmStack.Screen name="EquipmentDetails" component={EquipmentDetailsScreen} options={{ headerShown: false }} />
+    </MyFarmStack.Navigator>
+  );
+};
 
 // Support Stack Navigator
 const SupportStackNavigator = () => (
@@ -262,43 +374,86 @@ const SupportStackNavigator = () => (
     <SupportStack.Screen name="Consultants" component={ConsultantsScreen} options={{ headerShown: false }} />
     <SupportStack.Screen name="FarmerNetwork" component={FarmerNetworkScreen} options={{ headerShown: false }} />
     <SupportStack.Screen name="GroupDetails" component={GroupDetailsScreen} options={{ headerShown: false }} />
-    <SupportStack.Screen name="ViewSchemes" component={ViewSchemesScreen} options={{ headerShown: false }} />
   </SupportStack.Navigator>
 );
 
 // Main Tab Navigator
-const TabNavigator = () => (
-  <Tab.Navigator
-    screenOptions={({ route }) => ({
-      tabBarIcon: ({ focused, color, size }) => {
-        let iconName;
+const TabNavigator = () => {
+  const { hasPendingOrders } = useOrderNotification();
+  const { userProfile } = useAuth();
+  const isFarmer = userProfile?.role === 'farmer';
 
-        if (route.name === 'Home') {
-          iconName = focused ? 'home' : 'home-outline';
-        } else if (route.name === 'Marketplace') {
-          iconName = focused ? 'cart' : 'cart-outline';
-        } else if (route.name === 'E-Learning') {
-          iconName = focused ? 'book' : 'book-outline';
-        } else if (route.name === 'Chatbot') {
-          iconName = focused ? 'chatbubble' : 'chatbubble-outline';
-        } else if (route.name === 'My Farm') {
-          iconName = focused ? 'leaf' : 'leaf-outline';
-        }
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
 
-        return <Ionicons name={iconName as any} size={size} color={color} />;
-      },
-      tabBarActiveTintColor: '#4CAF50',
-      tabBarInactiveTintColor: 'gray',
-      headerShown: false,
-    })}
-  >
+          if (route.name === 'Home') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'Marketplace') {
+            iconName = focused ? 'cart' : 'cart-outline';
+          } else if (route.name === 'E-Learning') {
+            iconName = focused ? 'book' : 'book-outline';
+          } else if (route.name === 'Chatbot') {
+            iconName = focused ? 'chatbubble' : 'chatbubble-outline';
+          } else if (route.name === 'My Farm') {
+            iconName = focused ? 'leaf' : 'leaf-outline';
+          }
+
+          // For Marketplace tab, show a red dot if there are pending orders
+          if (route.name === 'Marketplace' && hasPendingOrders) {
+            return (
+              <View style={{ position: 'relative' }}>
+                <Ionicons name={iconName as any} size={size} color={color} />
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: -4,
+                    right: -4,
+                    backgroundColor: '#FF0000',
+                    width: 10,
+                    height: 10,
+                    borderRadius: 5,
+                    borderWidth: 1,
+                    borderColor: 'white',
+                  }}
+                />
+              </View>
+            );
+          }
+
+          return <Ionicons name={iconName as any} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: '#4CAF50',
+        tabBarInactiveTintColor: 'gray',
+        headerShown: false,
+      })}
+    >
     <Tab.Screen name="Home" component={HomeStackNavigator} />
     <Tab.Screen name="Marketplace" component={MarketplaceStackNavigator} />
     <Tab.Screen name="E-Learning" component={ELearningStackNavigator} />
     <Tab.Screen name="Chatbot" component={ChatbotStackNavigator} />
-    <Tab.Screen name="My Farm" component={MyFarmStackNavigator} />
+    {isFarmer && (
+      <Tab.Screen
+        name="My Farm"
+        component={MyFarmStackNavigator}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            // Prevent default behavior
+            e.preventDefault();
+
+            // Navigate to My Farm and reset to main screen
+            navigation.navigate('My Farm', {
+              screen: 'MyFarmMain'
+            });
+          },
+        })}
+      />
+    )}
   </Tab.Navigator>
-);
+  );
+};
 
 // Main App Navigator
 const AppNavigator = () => {
@@ -330,7 +485,7 @@ const AppNavigator = () => {
   console.log("UserProfile:", userProfile ? "Exists" : "Does not exist");
 
   if (userProfile) {
-    console.log("Profile complete flag:", userProfile.profileComplete);
+    console.log("Profile complete flag:", userProfile?.profileComplete);
     console.log("Profile complete type:", typeof userProfile.profileComplete);
 
     // Check if profile has all required fields
@@ -393,8 +548,20 @@ const AppNavigator = () => {
     );
   } else if (user && userProfile && isProfileActuallyComplete) {
     // User is logged in and profile is actually complete with all required fields
-    console.log("DECISION: User authenticated and profile actually complete, showing TabNavigator");
-    currentNavigator = <TabNavigator />;
+    if (userProfile.role === 'delivery_partner') {
+      // Delivery partners see the delivery management screen instead of the main app
+      console.log("DECISION: User is a delivery partner, showing DeliveryManagementScreen");
+      currentNavigator = (
+        <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+          <AuthStack.Screen name="DeliveryManagement" component={DeliveryManagementScreen} />
+          <AuthStack.Screen name="Earnings" component={EarningsScreen} />
+        </AuthStack.Navigator>
+      );
+    } else {
+      // Regular users see the main app
+      console.log("DECISION: User authenticated and profile actually complete, showing TabNavigator");
+      currentNavigator = <TabNavigator />;
+    }
   } else if (user && userProfile) {
     // User is logged in but profile is not complete with all required fields
     console.log("DECISION: User logged in but profile incomplete, showing ProfileSetup");

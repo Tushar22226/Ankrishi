@@ -63,12 +63,12 @@ const TabView: React.FC<TabViewProps> = ({
   // Measure tab widths and positions
   const measureTab = (key: string, event: LayoutChangeEvent) => {
     const { width, x } = event.nativeEvent.layout;
-    
+
     setTabWidths(prev => ({
       ...prev,
       [key]: width,
     }));
-    
+
     setTabPositions(prev => ({
       ...prev,
       [key]: x,
@@ -104,7 +104,7 @@ const TabView: React.FC<TabViewProps> = ({
       const screenWidth = Dimensions.get('window').width;
       const tabCenter = tabPositions[activeTab] + (tabWidths[activeTab] / 2);
       const scrollTo = tabCenter - (screenWidth / 2);
-      
+
       scrollViewRef.current.scrollTo({
         x: Math.max(0, scrollTo),
         animated: true,
@@ -147,7 +147,7 @@ const TabView: React.FC<TabViewProps> = ({
               {tab.icon && (
                 <Ionicons
                   name={tab.icon as any}
-                  size={18}
+                  size={20}
                   color={activeTab === tab.key ? colors.primary : colors.textSecondary}
                   style={styles.tabIcon}
                 />
@@ -171,7 +171,7 @@ const TabView: React.FC<TabViewProps> = ({
             </View>
           </TouchableOpacity>
         ))}
-        
+
         {/* Animated indicator */}
         <Animated.View
           style={[
@@ -193,6 +193,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderBottomWidth: 1,
     borderBottomColor: colors.lightGray,
+    elevation: 2,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    paddingTop: spacing.xs,
   },
   scrollContent: {
     flexGrow: 1,
@@ -202,24 +208,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
+    marginHorizontal: spacing.xs / 2,
   },
   activeTab: {
-    // Active tab styling is handled by the indicator
+    backgroundColor: colors.surfaceLight,
+    borderTopLeftRadius: borderRadius.md,
+    borderTopRightRadius: borderRadius.md,
   },
   tabContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   tabIcon: {
     marginRight: spacing.xs,
+    width: 20,
+    textAlign: 'center',
   },
   tabText: {
     fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily.medium,
     color: colors.textSecondary,
+    textAlign: 'center',
   },
   activeTabText: {
     color: colors.primary,
+    fontFamily: typography.fontFamily.bold,
   },
   indicator: {
     position: 'absolute',
@@ -228,6 +243,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderTopLeftRadius: 3,
     borderTopRightRadius: 3,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: -1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 2,
   },
   badge: {
     backgroundColor: colors.error,

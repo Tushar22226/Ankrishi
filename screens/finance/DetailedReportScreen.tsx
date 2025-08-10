@@ -6,27 +6,18 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  Platform,
-  ActivityIndicator,
-  Share,
-  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { colors, typography, spacing, borderRadius } from '../../theme';
+import { colors, typography, spacing } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import Card from '../../components/Card';
 import Button from '../../components/Button';
 import { getPlatformTopSpacing } from '../../utils/platformUtils';
 import LoadingQuote from '../../components/LoadingQuote';
 import FinanceService from '../../services/FinanceService';
-import MarketplaceService from '../../services/MarketplaceService';
-import ContractService from '../../services/ContractService';
 import PDFService from '../../services/PDFService';
-import { Transaction, Income, Expense, isIncome, isExpense } from '../../models/Finance';
-import { Order, OrderItem } from '../../models/Product';
-import { Contract } from '../../models/Contract';
-import { formatDate, formatCurrency } from '../../utils/formatUtils';
+import { isIncome, isExpense } from '../../models/Finance';
 
 // Combined transaction type for displaying in the table
 interface TransactionRow {
@@ -265,311 +256,9 @@ const DetailedReportScreen = () => {
     }
   };
 
-  // Generate HTML for PDF
-  const generateReportHTML = (): string => {
-    // Get date range for the report title
-    const startDateStr = new Date(dateRange.startDate).toLocaleDateString();
-    const endDateStr = new Date(dateRange.endDate).toLocaleDateString();
+  // We're now using PDFService.generateAndSharePDF instead of a local function
 
-    // Calculate summary values
-    const totalIncome = transactions
-      .filter(t => t.amount > 0)
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const totalExpense = transactions
-      .filter(t => t.amount < 0)
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-    const netProfit = totalIncome - totalExpense;
-
-    // Get current date and time for the report
-    const reportDate = new Date().toLocaleDateString();
-    const reportTime = new Date().toLocaleTimeString();
-
-    // Generate HTML
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>FarmConnect Financial Report</title>
-        <style>
-          body {
-            font-family: 'Helvetica Neue', Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            color: #333;
-            line-height: 1.5;
-          }
-          .logo-container {
-            text-align: center;
-            margin-bottom: 20px;
-          }
-          .logo {
-            font-size: 28px;
-            font-weight: bold;
-            color: #4CAF50;
-          }
-          .logo-tagline {
-            font-size: 14px;
-            color: #666;
-          }
-          .header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 2px solid #4CAF50;
-          }
-          .title {
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 5px;
-            color: #4CAF50;
-          }
-          .subtitle {
-            font-size: 16px;
-            color: #666;
-            margin-bottom: 10px;
-          }
-          .report-info {
-            font-size: 12px;
-            color: #888;
-            margin-top: 10px;
-          }
-          .summary-container {
-            margin-bottom: 30px;
-          }
-          .summary-title {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 15px;
-            color: #333;
-          }
-          .summary {
-            display: flex;
-            justify-content: space-between;
-            background-color: #f9f9f9;
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid #eee;
-          }
-          .summary-item {
-            text-align: center;
-            flex: 1;
-          }
-          .summary-label {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 8px;
-          }
-          .summary-value {
-            font-size: 20px;
-            font-weight: bold;
-          }
-          .income {
-            color: #28a745;
-          }
-          .expense {
-            color: #dc3545;
-          }
-          .profit {
-            color: #28a745;
-          }
-          .loss {
-            color: #dc3545;
-          }
-          .table-container {
-            margin-top: 30px;
-            margin-bottom: 30px;
-          }
-          .table-title {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 15px;
-            color: #333;
-          }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-          }
-          th {
-            background-color: #4CAF50;
-            color: white;
-            padding: 12px 10px;
-            text-align: left;
-            font-weight: bold;
-          }
-          td {
-            padding: 10px;
-            border-bottom: 1px solid #ddd;
-          }
-          tr:nth-child(even) {
-            background-color: #f9f9f9;
-          }
-          tr:hover {
-            background-color: #f1f1f1;
-          }
-          .transaction-type {
-            font-weight: bold;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-            min-width: 70px;
-            text-align: center;
-          }
-          .type-income {
-            background-color: rgba(40, 167, 69, 0.1);
-            color: #28a745;
-          }
-          .type-expense {
-            background-color: rgba(220, 53, 69, 0.1);
-            color: #dc3545;
-          }
-          .type-sale {
-            background-color: rgba(0, 123, 255, 0.1);
-            color: #007bff;
-          }
-          .type-purchase {
-            background-color: rgba(255, 193, 7, 0.1);
-            color: #ffc107;
-          }
-          .type-rental {
-            background-color: rgba(111, 66, 193, 0.1);
-            color: #6f42c1;
-          }
-          .amount-cell {
-            font-weight: bold;
-            text-align: right;
-          }
-          .footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #eee;
-            text-align: center;
-            font-size: 12px;
-            color: #666;
-          }
-          .footer-logo {
-            font-weight: bold;
-            color: #4CAF50;
-          }
-          .page-number {
-            text-align: right;
-            font-size: 12px;
-            color: #999;
-            margin-top: 20px;
-          }
-          @media print {
-            body {
-              padding: 0;
-              font-size: 12px;
-            }
-            .summary-value {
-              font-size: 16px;
-            }
-            table {
-              font-size: 11px;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="logo-container">
-          <div class="logo">FarmConnect</div>
-          <div class="logo-tagline">Financial Management</div>
-        </div>
-
-        <div class="header">
-          <div class="title">Financial Transactions Report</div>
-          <div class="subtitle">Period: ${startDateStr} - ${endDateStr}</div>
-          <div class="report-info">
-            Generated on: ${reportDate} at ${reportTime}
-            ${userProfile?.displayName ? `<br>User: ${userProfile.displayName}` : ''}
-            ${userProfile?.farmName ? `<br>Farm: ${userProfile.farmName}` : ''}
-          </div>
-        </div>
-
-        <div class="summary-container">
-          <div class="summary-title">Financial Summary</div>
-          <div class="summary">
-            <div class="summary-item">
-              <div class="summary-label">Total Income</div>
-              <div class="summary-value income">₹${totalIncome.toLocaleString()}</div>
-            </div>
-            <div class="summary-item">
-              <div class="summary-label">Total Expense</div>
-              <div class="summary-value expense">₹${totalExpense.toLocaleString()}</div>
-            </div>
-            <div class="summary-item">
-              <div class="summary-label">Net Profit</div>
-              <div class="summary-value ${netProfit >= 0 ? 'profit' : 'loss'}">₹${netProfit.toLocaleString()}</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="table-container">
-          <div class="table-title">Transaction Details</div>
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Type</th>
-                <th>Description</th>
-                <th>Category</th>
-                <th>Source/Vendor</th>
-                <th>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${transactions.map(transaction => {
-                // Determine type class
-                let typeClass = '';
-                switch(transaction.type) {
-                  case 'income': typeClass = 'type-income'; break;
-                  case 'expense': typeClass = 'type-expense'; break;
-                  case 'sale': typeClass = 'type-sale'; break;
-                  case 'purchase': typeClass = 'type-purchase'; break;
-                  case 'rental': typeClass = 'type-rental'; break;
-                  case 'contract_payment_received': typeClass = 'type-income'; break;
-                  case 'contract_payment_made': typeClass = 'type-expense'; break;
-                }
-
-                return `
-                <tr>
-                  <td>${new Date(transaction.date).toLocaleDateString()}</td>
-                  <td>
-                    <span class="transaction-type ${typeClass}">
-                      ${transaction.type === 'contract_payment_received' ? 'Contract' :
-                        transaction.type === 'contract_payment_made' ? 'Contract' :
-                        transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
-                    </span>
-                  </td>
-                  <td>${transaction.description}</td>
-                  <td>${transaction.category}</td>
-                  <td>${transaction.source || '-'}</td>
-                  <td class="amount-cell" style="color: ${transaction.amount >= 0 ? '#28a745' : '#dc3545'}">
-                    ${transaction.amount >= 0 ? '₹' + transaction.amount.toLocaleString() : '-₹' + Math.abs(transaction.amount).toLocaleString()}
-                  </td>
-                </tr>
-              `}).join('')}
-            </tbody>
-          </table>
-        </div>
-
-        <div class="footer">
-          <p>This report was generated by <span class="footer-logo">FarmConnect</span> Financial Management System</p>
-          <p>For questions or support, please contact our support team.</p>
-        </div>
-
-        <div class="page-number">Page 1 of 1</div>
-      </body>
-      </html>
-    `;
-  };
-
-  // Share report
+  // Share report as PDF
   const shareReport = async () => {
     try {
       setSharingPdf(true);
@@ -578,8 +267,19 @@ const DetailedReportScreen = () => {
       const startDateStr = new Date(dateRange.startDate).toLocaleDateString();
       const endDateStr = new Date(dateRange.endDate).toLocaleDateString();
 
-      // Generate text report
-      const textReport = PDFService.generateTextReport(
+      // Prepare user information for the PDF
+      const userInfo = {
+        name: userProfile?.displayName,
+        farmName: userProfile?.farmDetails?.name || userProfile?.displayName + "'s Farm",
+        phoneNumber: userProfile?.phoneNumber,
+        location: userProfile?.location?.address ||
+                 (userProfile?.location?.latitude && userProfile?.location?.longitude
+                   ? `${userProfile.location.latitude.toFixed(4)}, ${userProfile.location.longitude.toFixed(4)}`
+                   : undefined)
+      };
+
+      // Generate and share PDF report
+      const result = await PDFService.generateAndSharePDF(
         'Financial Transactions Report',
         `Period: ${startDateStr} to ${endDateStr}`,
         {
@@ -588,20 +288,36 @@ const DetailedReportScreen = () => {
           netProfit: summary.netProfit
         },
         transactions,
-        {
-          name: userProfile?.displayName,
-          farmName: userProfile?.farmName
-        }
+        userInfo,
+        userProfile?.uid // Pass user ID for Firebase Storage upload
       );
 
-      // Share the report
-      await Share.share({
-        title: `FarmConnect Financial Report (${startDateStr} to ${endDateStr})`,
-        message: textReport,
-      });
+      // Show success message based on result
+      let successMessage = 'Report has been processed successfully!';
+
+      if (result.method === 'print') {
+        successMessage = result.isCloudStored
+          ? 'Report has been uploaded to cloud storage and print dialog opened! You can print or save as PDF.'
+          : 'Print dialog opened! You can print or save the report as PDF.';
+      } else if (result.isCloudStored) {
+        successMessage = 'Report has been uploaded to cloud storage and shared successfully! The download link has been included in the share message.';
+      } else {
+        successMessage = 'Report has been shared successfully!';
+      }
+
+      Alert.alert(
+        'Success',
+        successMessage,
+        [{ text: 'OK' }]
+      );
     } catch (error) {
-      console.error('Error sharing report:', error);
-      Alert.alert('Error', 'Failed to share report. Please try again.');
+      console.error('Error sharing PDF report:', error);
+      // The PDFService will handle fallback to text report if PDF generation fails
+      // So we don't need to show an additional error here unless it's a different type of error
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (!errorMessage.includes('PDF Generation Failed')) {
+        Alert.alert('Error', 'Failed to share report. Please try again.');
+      }
     } finally {
       setSharingPdf(false);
     }
@@ -747,7 +463,7 @@ const DetailedReportScreen = () => {
       <View style={styles.disclaimerContainer}>
         <Text style={styles.disclaimerText}>
           This report includes all transactions from your orders (sales, purchases, rentals) and additional income/expenses.
-          The report will be shared as a formatted text message that you can view, save, or forward to others.
+          The report will be uploaded to secure cloud storage and you can print, save as PDF, or share the download link.
         </Text>
       </View>
     </View>
@@ -759,14 +475,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.surfaceLight,
     ...getPlatformTopSpacing('paddingTop', 0, spacing.md),
+    marginTop:17,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
+    borderBottomWidth: 0,
     borderBottomColor: colors.lightGray,
   },
   backButton: {

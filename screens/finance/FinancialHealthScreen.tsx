@@ -344,6 +344,15 @@ const FinancialHealthScreen = () => {
             ) : (
               <View style={styles.scoreDetailsContainer}>
                 <Text style={styles.scoreDetailsTitle}>Score Breakdown</Text>
+                <TouchableOpacity
+                  onPress={() => Alert.alert(
+                    'How Your Score is Calculated',
+                    'Your overall score is calculated as a percentage of the maximum possible points across all categories (140 total). If any category is low, it will directly impact your overall score. Improve each category to increase your overall financial health score.'
+                  )}
+                  style={styles.infoButton}
+                >
+                  <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
+                </TouchableOpacity>
 
                 {financialHealth.categories.map(category => (
                   <View key={category.id} style={styles.scoreDetailItem}>
@@ -786,6 +795,12 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: spacing.md,
     textAlign: 'center',
+  },
+  infoButton: {
+    position: 'absolute',
+    right: spacing.md,
+    top: spacing.md,
+    padding: spacing.xs,
   },
   scoreDetailItem: {
     flexDirection: 'row',

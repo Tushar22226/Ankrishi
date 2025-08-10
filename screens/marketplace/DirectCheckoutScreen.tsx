@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   TextInput,
+    FlatList,
   ActivityIndicator,
   Alert,
   Platform,
@@ -16,12 +17,15 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { colors, typography, spacing, borderRadius, shadows } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import MarketplaceService from '../../services/MarketplaceService';
+import database from '@react-native-firebase/database';
 import { Product, OrderItem, PaymentMethod, ProductAvailabilityMode } from '../../models/Product';
 import { UserProfile } from '../../context/AuthContext';
 import Card from '../../components/Card';
 import Button from '../../components/Button';
 import { getPlatformTopSpacing } from '../../utils/platformUtils';
 import LoadingQuote from '../../components/LoadingQuote';
+import WalletService from '../../services/WalletService';
+import CartService from '../../services/CartService';
 
 const DirectCheckoutScreen = () => {
   const navigation = useNavigation();
@@ -29,18 +33,27 @@ const DirectCheckoutScreen = () => {
   const { userProfile } = useAuth();
 
   // Get params from route
-  const { productId, quantity, farmerId } = route.params as {
-    productId: string;
-    quantity: number;
-    farmerId: string;
+  const { productId, quantity, farmerId, isNegotiated, negotiatedPrice, totalNegotiatedPrice, fromCart, cartItems, isPrelisted } = route.params as {
+    productId?: string;
+    quantity?: number;
+    farmerId?: string;
+    isNegotiated?: boolean;
+    negotiatedPrice?: number; // Per unit price
+    totalNegotiatedPrice?: number; // Total price for all units
+    fromCart?: boolean;
+    cartItems?: any[];
+    isPrelisted?: boolean; // Flag to indicate if this is a prelisted product
   };
+
+  // State for multiple products
+  const [multipleProducts, setMultipleProducts] = useState<boolean>(false);
 
   // State
   const [loading, setLoading] = useState(true);
   const [product, setProduct] = useState<Product | null>(null);
   const [farmer, setFarmer] = useState<UserProfile | null>(null);
   const [deliveryOption, setDeliveryOption] = useState<'self_pickup' | 'delivery'>('delivery');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash_on_delivery');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('wallet');
   const [shippingAddress, setShippingAddress] = useState({
     name: '',
     phone: '',
@@ -50,58 +63,141 @@ const DirectCheckoutScreen = () => {
     pincode: '',
   });
   const [processingOrder, setProcessingOrder] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [loadingWallet, setLoadingWallet] = useState(true);
 
   // Load product and farmer details
   useEffect(() => {
     loadData();
-  }, [productId, farmerId]);
+  }, [productId, farmerId, fromCart, cartItems]);
+
+  // State for available balance (total balance minus held funds)
+  const [availableBalance, setAvailableBalance] = useState<number | null>(null);
+  const [heldBalance, setHeldBalance] = useState<number | null>(null);
+
+  // Load wallet balance
+  useEffect(() => {
+    const loadWalletBalance = async () => {
+      if (!userProfile) return;
+
+      try {
+        setLoadingWallet(true);
+        // Get total balance
+        const balance = await WalletService.getBalance(userProfile.uid);
+        setWalletBalance(balance);
+
+        // Get held balance
+        const held = await WalletService.getHeldBalance(userProfile.uid);
+        setHeldBalance(held);
+
+        // Calculate available balance
+        const available = await WalletService.getAvailableBalance(userProfile.uid);
+        setAvailableBalance(available);
+      } catch (error) {
+        console.error('Error loading wallet balance:', error);
+        Alert.alert('Error', 'Failed to load wallet balance');
+      } finally {
+        setLoadingWallet(false);
+      }
+    };
+
+    loadWalletBalance();
+  }, [userProfile]);
 
   // Load data
   const loadData = async () => {
     try {
       setLoading(true);
 
-      // Get product details
-      const productData = await MarketplaceService.getProduct(productId);
+      if (fromCart && cartItems && cartItems.length > 0) {
+        // Handle checkout from cart with multiple items
+        setMultipleProducts(true);
 
-      if (!productData) {
-        Alert.alert('Error', 'Product not found');
+        // Get the first product details to display
+        const firstProductData = await MarketplaceService.getProduct(cartItems[0].productId);
+        if (!firstProductData) {
+          Alert.alert('Error', 'Product not found');
+          navigation.goBack();
+          return;
+        }
+
+        setProduct(firstProductData);
+
+        // Set delivery option based on product availability mode
+        if (firstProductData.availabilityMode === 'market_only') {
+          // Market-only products can only be picked up
+          setDeliveryOption('self_pickup');
+        } else if (firstProductData.availabilityMode === 'pickup_available') {
+          // Default to pickup for pickup_available products
+          setDeliveryOption('self_pickup');
+        } else if (firstProductData.availabilityMode === 'delivery_only') {
+          // Delivery-only products can only be delivered
+          setDeliveryOption('delivery');
+        }
+
+        // Get farmer profile from the first product
+        const firstFarmerId = cartItems[0].sellerId;
+        const { profile } = await MarketplaceService.getFarmerProfile(firstFarmerId);
+
+        if (!profile) {
+          Alert.alert('Error', 'Farmer not found');
+          navigation.goBack();
+          return;
+        }
+
+        setFarmer(profile);
+      } else if (productId) {
+        // Handle single product checkout
+        // Get product details
+        const productData = await MarketplaceService.getProduct(productId);
+
+        if (!productData) {
+          Alert.alert('Error', 'Product not found');
+          navigation.goBack();
+          return;
+        }
+
+        // Check if user is trying to buy their own product
+        if (userProfile && userProfile.uid === productData.sellerId) {
+          Alert.alert('Error', 'You cannot purchase your own product');
+          navigation.goBack();
+          return;
+        }
+
+        // Update product with isPrelisted flag if it came from route params
+        setProduct({
+          ...productData,
+          isPrelisted: isPrelisted || productData.isPrelisted || false
+        });
+
+        // Set delivery option based on product availability mode
+        if (productData.availabilityMode === 'market_only') {
+          // Market-only products can only be picked up
+          setDeliveryOption('self_pickup');
+        } else if (productData.availabilityMode === 'pickup_available') {
+          // Default to pickup for pickup_available products
+          setDeliveryOption('self_pickup');
+        } else if (productData.availabilityMode === 'delivery_only') {
+          // Delivery-only products can only be delivered
+          setDeliveryOption('delivery');
+        }
+        // For 'all' or undefined, keep the default ('delivery')
+
+        // Get farmer profile
+        const { profile } = await MarketplaceService.getFarmerProfile(farmerId!);
+
+        if (!profile) {
+          Alert.alert('Error', 'Farmer not found');
+          navigation.goBack();
+          return;
+        }
+
+        setFarmer(profile);
+      } else {
+        Alert.alert('Error', 'Invalid checkout parameters');
         navigation.goBack();
         return;
       }
-
-      // Check if user is trying to buy their own product
-      if (userProfile && userProfile.uid === productData.sellerId) {
-        Alert.alert('Error', 'You cannot purchase your own product');
-        navigation.goBack();
-        return;
-      }
-
-      setProduct(productData);
-
-      // Set delivery option based on product availability mode
-      if (productData.availabilityMode === 'market_only') {
-        // Market-only products can only be picked up
-        setDeliveryOption('self_pickup');
-      } else if (productData.availabilityMode === 'pickup_available') {
-        // Default to pickup for pickup_available products
-        setDeliveryOption('self_pickup');
-      } else if (productData.availabilityMode === 'delivery_only') {
-        // Delivery-only products can only be delivered
-        setDeliveryOption('delivery');
-      }
-      // For 'all' or undefined, keep the default ('delivery')
-
-      // Get farmer profile
-      const { profile } = await MarketplaceService.getFarmerProfile(farmerId);
-
-      if (!profile) {
-        Alert.alert('Error', 'Farmer not found');
-        navigation.goBack();
-        return;
-      }
-
-      setFarmer(profile);
 
       // Pre-fill shipping address if user profile has address
       if (userProfile) {
@@ -125,18 +221,101 @@ const DirectCheckoutScreen = () => {
 
   // Calculate total price
   const calculateTotalPrice = () => {
-    if (!product) return 0;
+    if (multipleProducts && cartItems) {
+      // Calculate total for multiple products
+      return cartItems.reduce((total, item) => {
+        const itemPrice = item.discountedPrice || item.price;
+        return total + (itemPrice * item.quantity);
+      }, 0);
+    } else if (product) {
+      // Calculate for single product
+      // If this is a negotiated order, use the negotiated price per unit * quantity
+      if (isNegotiated && negotiatedPrice) {
+        return negotiatedPrice * (quantity || 0);
+      }
 
-    const itemPrice = product.discountedPrice || product.price;
-    return itemPrice * quantity;
+      // Otherwise use the regular price
+      const itemPrice = product.discountedPrice || product.price;
+      return itemPrice * (quantity || 0);
+    }
+
+    return 0;
   };
 
   // Calculate delivery fee
   const calculateDeliveryFee = () => {
     if (deliveryOption === 'self_pickup') return 0;
 
-    const totalPrice = calculateTotalPrice();
-    return totalPrice > 1000 ? 0 : 50; // Free delivery for orders over ₹1000
+    // Fixed delivery fee of ₹100 for all products
+    let deliveryFee = 100;
+
+    // Special handling for prelisted products
+    if (multipleProducts && cartItems) {
+      // Check if we have multiple prelisted products with different harvest dates
+      const prelistedProducts = cartItems.filter(item => item.isPrelisted);
+
+      if (prelistedProducts.length > 0) {
+        // Get unique harvest dates
+        const harvestDates = new Set();
+        prelistedProducts.forEach(item => {
+          // Check for harvest date in farmDetails first
+          if (item.farmDetails?.harvestDate) {
+            harvestDates.add(new Date(item.farmDetails.harvestDate).toDateString());
+          }
+          // Then check in traceabilityInfo if not found in farmDetails
+          else if (item.traceabilityInfo?.harvestDate) {
+            harvestDates.add(new Date(item.traceabilityInfo.harvestDate).toDateString());
+          }
+        });
+
+        // If we have multiple prelisted products with different harvest dates
+        if (harvestDates.size > 1) {
+          // Add 50 extra per item after the first one
+          deliveryFee += (harvestDates.size - 1) * 50;
+        }
+
+        // Check if any product is harvesting tomorrow
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowString = tomorrow.toDateString();
+
+        const hasProductHarvestingTomorrow = Array.from(harvestDates).some(
+          date => date === tomorrowString
+        );
+
+        // No extra charges if harvesting tomorrow
+        if (hasProductHarvestingTomorrow) {
+          deliveryFee = 100;
+        }
+      }
+    } else if (product?.isPrelisted) {
+      // Single prelisted product
+      let harvestDate = null;
+
+      // Check for harvest date in farmDetails first
+      if (product.farmDetails?.harvestDate) {
+        harvestDate = new Date(product.farmDetails.harvestDate);
+      }
+      // Then check in traceabilityInfo if not found in farmDetails
+      else if (product.traceabilityInfo?.harvestDate) {
+        harvestDate = new Date(product.traceabilityInfo.harvestDate);
+      }
+
+      if (harvestDate) {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        // If not harvesting tomorrow, add 100 extra
+        if (harvestDate.toDateString() !== tomorrow.toDateString()) {
+          deliveryFee += 100;
+        }
+      } else {
+        // No harvest date found, use standard fee
+        console.log('No harvest date found for prelisted product, using standard fee');
+      }
+    }
+
+    return deliveryFee;
   };
 
   // Calculate total amount
@@ -191,42 +370,386 @@ const DirectCheckoutScreen = () => {
         return;
       }
 
-      if (!product) {
+      // Check if we have product information
+      if (!multipleProducts && !product) {
         Alert.alert('Error', 'Product information is missing');
         return;
       }
 
+      // Check if we have cart items for multiple products
+      if (multipleProducts && (!cartItems || cartItems.length === 0)) {
+        Alert.alert('Error', 'Cart items are missing');
+        return;
+      }
+
       // Double-check that user is not buying their own product
-      if (userProfile.uid === product.sellerId) {
+      if (!multipleProducts && product && userProfile.uid === product.sellerId) {
         Alert.alert('Error', 'You cannot purchase your own product');
         navigation.goBack();
         return;
       }
 
+      // Check if user has sufficient total balance
+      if (walletBalance === null || walletBalance < calculateTotalAmount()) {
+        Alert.alert('Insufficient Balance', 'You do not have enough balance in your Ankrishi-Wallet to complete this purchase. Please add funds to your wallet.');
+        return;
+      }
+
+      // Check if user has sufficient available balance (total balance minus held funds)
+      if (availableBalance === null || availableBalance < calculateTotalAmount()) {
+        Alert.alert(
+          'Insufficient Available Balance',
+          `You have ₹${walletBalance?.toFixed(2)} in your wallet, but ₹${heldBalance?.toFixed(2)} is currently held for pending orders. Your available balance is ₹${availableBalance?.toFixed(2)}. Please add more funds or wait for your held funds to be released.`
+        );
+        return;
+      }
+
       setProcessingOrder(true);
 
-      // Create order item
-      const orderItem: OrderItem = {
-        productId: product.id,
-        productName: product.name,
-        productImage: product.images[0]?.url || '',
-        quantity,
-        price: product.discountedPrice || product.price,
-        totalPrice: (product.discountedPrice || product.price) * quantity,
-      };
+      if (multipleProducts && cartItems && cartItems.length > 0) {
+        // Handle multiple products from cart
+        const orderIds: string[] = [];
 
-      // Create direct order
-      const orderId = await MarketplaceService.createDirectOrder(
-        userProfile.uid,
-        farmerId,
-        [orderItem],
-        shippingAddress,
-        paymentMethod,
-        deliveryOption
-      );
+        // Group products by seller
+        const groupedProducts: Record<string, any[]> = {};
+        cartItems.forEach(item => {
+          if (!groupedProducts[item.sellerId]) {
+            groupedProducts[item.sellerId] = [];
+          }
+          groupedProducts[item.sellerId].push(item);
+        });
 
-      // Navigate to order tracking screen
-      navigation.navigate('OrderTracking' as never, { orderId } as never);
+        // Process each seller's order separately
+        for (const sellerId in groupedProducts) {
+          const sellerProducts = groupedProducts[sellerId];
+
+          // Create order items
+          const orderItems = sellerProducts.map(item => ({
+            productId: item.productId,
+            productName: item.name,
+            productImage: item.image || '',
+            quantity: item.quantity,
+            price: item.discountedPrice || item.price,
+            totalPrice: (item.discountedPrice || item.price) * item.quantity,
+            isNegotiated: false,
+            negotiatedPrice: undefined,
+            isPrelisted: item.isPrelisted || false,
+            // Include harvest date for prelisted products
+            ...(item.isPrelisted && item.farmDetails?.harvestDate ? {
+              harvestDate: item.farmDetails.harvestDate
+            } : {})
+          }));
+
+          // Calculate total price for this seller's products
+          const sellerSubtotal = sellerProducts.reduce((total, item) => {
+            const itemPrice = item.discountedPrice || item.price;
+            return total + (itemPrice * item.quantity);
+          }, 0);
+
+          // Calculate delivery fee for this order
+          const sellerDeliveryFee = sellerSubtotal > 1000 ? 0 : (deliveryOption === 'self_pickup' ? 0 : 50);
+
+          // Calculate total amount for this order
+          const sellerTotalAmount = sellerSubtotal + sellerDeliveryFee;
+
+          // 1. Hold money in buyer's wallet (don't transfer yet)
+          const holdTransaction = await WalletService.holdBalance(
+            userProfile.uid,
+            sellerTotalAmount,
+            `Payment for order from ${sellerProducts[0].seller} - Pending confirmation`,
+            'pending', // Will be updated after order creation
+            sellerId
+          );
+
+          // 2. Store delivery fee information if applicable
+          let deliveryFeeData = null;
+          if (sellerDeliveryFee > 0) {
+            const deliveryFeesRef = database().ref('delivery_fees');
+            deliveryFeeData = {
+              orderId: 'pending', // Will be updated after order creation
+              buyerId: userProfile.uid,
+              farmerId: sellerId,
+              amount: sellerDeliveryFee,
+              timestamp: Date.now(),
+              holdTransactionId: holdTransaction.id
+            };
+            await deliveryFeesRef.push(deliveryFeeData);
+          }
+
+          // Create order with payment hold information
+          const orderId = await MarketplaceService.createDirectOrder(
+            userProfile.uid,
+            sellerId,
+            orderItems,
+            shippingAddress,
+            paymentMethod,
+            deliveryOption,
+            undefined, // deliveryAgentId
+            holdTransaction.id // Store the hold transaction ID with the order
+          );
+
+          // Update the hold transaction with the order ID
+          await database().ref(`wallets/${userProfile.uid}/transactions/${holdTransaction.id}`).update({
+            relatedOrderId: orderId
+          });
+
+          // Update delivery fee record with the order ID if applicable
+          if (sellerDeliveryFee > 0 && deliveryFeeData) {
+            // Find the delivery fee record we just created
+            const deliveryFeesRef = database().ref('delivery_fees');
+            const snapshot = await deliveryFeesRef.orderByChild('timestamp')
+              .equalTo(deliveryFeeData.timestamp)
+              .once('value');
+
+            if (snapshot.exists()) {
+              // Update the first matching record
+              const deliveryFeeRecords = snapshot.val();
+              const deliveryFeeId = Object.keys(deliveryFeeRecords)[0];
+              await deliveryFeesRef.child(deliveryFeeId).update({
+                orderId: orderId
+              });
+            }
+          }
+
+          // Create food_delivery entry if delivery option is selected
+          if (deliveryOption === 'delivery') {
+            // Create food_delivery entry
+            await database().ref(`food_delivery/${orderId}`).set({
+              order_id: orderId,
+              product_status: 'pending',
+              delivery_charge: sellerDeliveryFee,
+              cash_on_delivery: 0, // Not using cash on delivery
+              customer_details: {
+                name: shippingAddress.name,
+                phone: shippingAddress.phone,
+                address: shippingAddress.address,
+                city: shippingAddress.city,
+                state: shippingAddress.state,
+                pincode: shippingAddress.pincode,
+              },
+              created_at: Date.now(),
+              updated_at: Date.now(),
+              payment_method: 'wallet',
+              // Check if any products are prelisted
+              is_prelisted: sellerProducts.some(item => item.isPrelisted),
+              // If there are prelisted products, find the earliest harvest date
+              harvest_date: (() => {
+                // Get all prelisted products
+                const prelistedProducts = sellerProducts.filter(item => item.isPrelisted);
+                if (prelistedProducts.length === 0) return null;
+
+                // Collect all harvest dates from different possible locations
+                const harvestDates = [];
+
+                for (const item of prelistedProducts) {
+                  // Check farmDetails first
+                  if (item.farmDetails?.harvestDate) {
+                    harvestDates.push(item.farmDetails.harvestDate);
+                  }
+                  // Then check traceabilityInfo
+                  else if (item.traceabilityInfo?.harvestDate) {
+                    harvestDates.push(item.traceabilityInfo.harvestDate);
+                  }
+                }
+
+                if (harvestDates.length === 0) return null;
+
+                // Find the earliest harvest date
+                return Math.min(...harvestDates);
+              })(),
+              // For prelisted products, set expected delivery date to the evening of harvest date
+              expected_delivery_date: (() => {
+                // Get all prelisted products
+                const prelistedProducts = sellerProducts.filter(item => item.isPrelisted);
+                if (prelistedProducts.length === 0) return null;
+
+                // Collect all harvest dates from different possible locations
+                const harvestDates = [];
+
+                for (const item of prelistedProducts) {
+                  // Check farmDetails first
+                  if (item.farmDetails?.harvestDate) {
+                    harvestDates.push(item.farmDetails.harvestDate);
+                  }
+                  // Then check traceabilityInfo
+                  else if (item.traceabilityInfo?.harvestDate) {
+                    harvestDates.push(item.traceabilityInfo.harvestDate);
+                  }
+                }
+
+                if (harvestDates.length === 0) return null;
+
+                // Find the earliest harvest date
+                const earliestHarvestDate = Math.min(...harvestDates);
+                const deliveryDate = new Date(earliestHarvestDate);
+                deliveryDate.setHours(17, 0, 0, 0); // 5pm on harvest date
+                return deliveryDate.getTime();
+              })()
+            });
+          }
+
+          orderIds.push(orderId);
+        }
+
+        // Clear cart after successful orders
+        await CartService.clearCart(userProfile.uid);
+
+        // Navigate to order success screen with multiple order IDs
+        navigation.navigate('OrderSuccess' as never, { orderIds } as never);
+        return; // Exit early to avoid the rest of the function
+      } else {
+        // Handle single product checkout
+        // Calculate amounts
+        const totalPrice = calculateTotalPrice();
+        const deliveryFee = calculateDeliveryFee();
+        const totalAmount = calculateTotalAmount();
+
+        // Create order item
+        const orderItem: OrderItem = {
+          productId: product!.id,
+          productName: product!.name,
+          productImage: product!.images[0]?.url || '',
+          quantity: quantity || 0,
+          price: isNegotiated && negotiatedPrice ? negotiatedPrice : (product!.discountedPrice || product!.price),
+          totalPrice: totalPrice,
+          isNegotiated: isNegotiated || false,
+          negotiatedPrice: negotiatedPrice, // Per unit price
+          isPrelisted: product!.isPrelisted || false,
+          // Include harvest date for prelisted products
+          ...(product!.isPrelisted ? (() => {
+            // Check for harvest date in multiple locations
+            if (product!.farmDetails?.harvestDate) {
+              return { harvestDate: product!.farmDetails.harvestDate };
+            } else if (product!.traceabilityInfo?.harvestDate) {
+              return { harvestDate: product!.traceabilityInfo.harvestDate };
+            }
+            return {};
+          })() : {})
+        };
+
+        // 1. Hold money in buyer's wallet (don't transfer yet)
+        const holdTransaction = await WalletService.holdBalance(
+          userProfile.uid,
+          totalAmount,
+          `Payment for ${product!.name} (${quantity} units) - Pending confirmation`,
+          'pending', // Will be updated after order creation
+          farmerId!
+        );
+
+        // 2. Store delivery fee information if applicable
+        let deliveryFeeData = null;
+        if (deliveryFee > 0) {
+          const deliveryFeesRef = database().ref('delivery_fees');
+          deliveryFeeData = {
+            orderId: 'pending', // Will be updated after order creation
+            buyerId: userProfile.uid,
+            farmerId: farmerId,
+            amount: deliveryFee,
+            timestamp: Date.now(),
+            productId: product!.id,
+            productName: product!.name,
+            holdTransactionId: holdTransaction.id
+          };
+          await deliveryFeesRef.push(deliveryFeeData);
+        }
+
+        // Create direct order with payment hold information
+        const orderId = await MarketplaceService.createDirectOrder(
+          userProfile.uid,
+          farmerId!,
+          [orderItem],
+          shippingAddress,
+          paymentMethod,
+          deliveryOption,
+          undefined, // deliveryAgentId
+          holdTransaction.id // Store the hold transaction ID with the order
+        );
+
+        // Update the hold transaction with the order ID
+        await database().ref(`wallets/${userProfile.uid}/transactions/${holdTransaction.id}`).update({
+          relatedOrderId: orderId
+        });
+
+        // Update delivery fee record with the order ID if applicable
+        if (deliveryFee > 0 && deliveryFeeData) {
+          // Find the delivery fee record we just created
+          const deliveryFeesRef = database().ref('delivery_fees');
+          const snapshot = await deliveryFeesRef.orderByChild('timestamp')
+            .equalTo(deliveryFeeData.timestamp)
+            .once('value');
+
+          if (snapshot.exists()) {
+            // Update the first matching record
+            const deliveryFeeRecords = snapshot.val();
+            const deliveryFeeId = Object.keys(deliveryFeeRecords)[0];
+            await deliveryFeesRef.child(deliveryFeeId).update({
+              orderId: orderId
+            });
+          }
+        }
+
+        // Create food_delivery entry if delivery option is selected
+        if (deliveryOption === 'delivery') {
+          // Create food_delivery entry
+          await database().ref(`food_delivery/${orderId}`).set({
+            product_id: product!.id,
+            order_id: orderId,
+            product_status: 'pending',
+            delivery_charge: deliveryFee,
+            cash_on_delivery: 0, // Not using cash on delivery
+            customer_details: {
+              name: shippingAddress.name,
+              phone: shippingAddress.phone,
+              address: shippingAddress.address,
+              city: shippingAddress.city,
+              state: shippingAddress.state,
+              pincode: shippingAddress.pincode,
+            },
+            created_at: Date.now(),
+            updated_at: Date.now(),
+            is_negotiated: isNegotiated || false,
+            negotiated_price_per_unit: negotiatedPrice || 0,
+            total_negotiated_price: totalPrice,
+            cash_on_delivery_amount: 0, // Not using cash on delivery
+            payment_method: 'wallet',
+            // Add prelisted product information
+            is_prelisted: product!.isPrelisted || false,
+            // Get harvest date from multiple possible locations
+            harvest_date: product!.isPrelisted ? (() => {
+              if (product!.farmDetails?.harvestDate) {
+                return product!.farmDetails.harvestDate;
+              } else if (product!.traceabilityInfo?.harvestDate) {
+                return product!.traceabilityInfo.harvestDate;
+              }
+              return null;
+            })() : null,
+            // For prelisted products, set expected delivery date to the evening of harvest date
+            expected_delivery_date: product!.isPrelisted ? (() => {
+              let harvestDate = null;
+
+              if (product!.farmDetails?.harvestDate) {
+                harvestDate = product!.farmDetails.harvestDate;
+              } else if (product!.traceabilityInfo?.harvestDate) {
+                harvestDate = product!.traceabilityInfo.harvestDate;
+              }
+
+              if (!harvestDate) return null;
+
+              const deliveryDate = new Date(harvestDate);
+              deliveryDate.setHours(17, 0, 0, 0); // 5pm on harvest date
+                return deliveryDate.getTime();
+              })() : null
+          });
+        }
+
+        // Clear cart if coming from cart
+        if (fromCart) {
+          await CartService.clearCart(userProfile.uid);
+        }
+
+        // Navigate to order success screen
+        navigation.navigate('OrderSuccess' as never, { orderIds: [orderId] } as never);
+      } // Close the else statement
     } catch (error) {
       console.error('Error placing order:', error);
       Alert.alert('Error', 'Failed to place order. Please try again.');
@@ -281,26 +804,70 @@ const DirectCheckoutScreen = () => {
         {/* Product Summary */}
         <Card style={styles.productCard}>
           <View style={styles.productHeader}>
-            <Text style={styles.sectionTitle}>Product Summary</Text>
+            <Text style={styles.sectionTitle}>
+              {multipleProducts ? 'Products Summary' : 'Product Summary'}
+            </Text>
           </View>
 
-          <View style={styles.productItem}>
-            <Image
-              source={{ uri: product?.images[0]?.url || 'https://via.placeholder.com/100x100?text=Product' }}
-              style={styles.productImage}
-              resizeMode="cover"
+          {multipleProducts && cartItems ? (
+            // Multiple products from cart
+            <FlatList
+              data={cartItems}
+              renderItem={({ item }) => (
+                <View style={styles.productItem}>
+                  <Image
+                    source={{ uri: item.image || 'https://via.placeholder.com/100x100?text=Product' }}
+                    style={styles.productImage}
+                    resizeMode="cover"
+                  />
+
+                  <View style={styles.productInfo}>
+                    <Text style={styles.productName}>{item.name}</Text>
+                    <Text style={styles.productPrice}>
+                      {formatCurrency(item.discountedPrice || item.price)} x {item.quantity}
+                    </Text>
+                    <Text style={styles.productTotal}>
+                      {formatCurrency((item.discountedPrice || item.price) * item.quantity)}
+                    </Text>
+                  </View>
+                </View>
+              )}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
             />
+          ) : (
+            // Single product
+            <View style={styles.productItem}>
+              <Image
+                source={{ uri: product?.images[0]?.url || 'https://via.placeholder.com/100x100?text=Product' }}
+                style={styles.productImage}
+                resizeMode="cover"
+              />
 
-            <View style={styles.productInfo}>
-              <Text style={styles.productName}>{product?.name}</Text>
-              <Text style={styles.productPrice}>
-                {formatCurrency(product?.discountedPrice || product?.price || 0)} x {quantity}
-              </Text>
-              <Text style={styles.productTotal}>
-                {formatCurrency(calculateTotalPrice())}
-              </Text>
+              <View style={styles.productInfo}>
+                <Text style={styles.productName}>{product?.name}</Text>
+                {isNegotiated ? (
+                  <>
+                    <Text style={styles.productPrice}>
+                      {formatCurrency(negotiatedPrice || 0)} x {quantity} <Text style={styles.negotiatedTag}>(Negotiated)</Text>
+                    </Text>
+                    <Text style={styles.productTotal}>
+                      {formatCurrency(calculateTotalPrice())}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.productPrice}>
+                      {formatCurrency(product?.discountedPrice || product?.price || 0)} x {quantity}
+                    </Text>
+                    <Text style={styles.productTotal}>
+                      {formatCurrency(calculateTotalPrice())}
+                    </Text>
+                  </>
+                )}
+              </View>
             </View>
-          </View>
+          )}
         </Card>
 
         {/* Farmer Info */}
@@ -398,9 +965,7 @@ const DirectCheckoutScreen = () => {
                   <Text style={[styles.deliveryOptionDescription, product?.availabilityMode === 'market_only' && styles.disabledText]}>
                     {product?.availabilityMode === 'market_only'
                       ? 'Not available for this product'
-                      : calculateDeliveryFee() > 0
-                        ? `Delivery fee: ${formatCurrency(calculateDeliveryFee())}`
-                        : 'Free delivery'}
+                      : `Delivery fee: ${formatCurrency(calculateDeliveryFee())}`}
                   </Text>
                 </View>
               </View>
@@ -560,19 +1125,39 @@ const DirectCheckoutScreen = () => {
           </View>
 
           <View style={styles.paymentOptions}>
+            <View style={styles.walletBalanceContainer}>
+              <Text style={styles.walletBalanceLabel}>Wallet Balance:</Text>
+              {loadingWallet ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <View>
+                  <Text style={styles.walletBalanceAmount}>
+                    ₹{walletBalance !== null ? walletBalance.toFixed(2) : '0.00'}
+                  </Text>
+                  <Text style={styles.walletAvailableBalance}>
+                    Available: ₹{availableBalance !== null ? availableBalance.toFixed(2) : '0.00'}
+                  </Text>
+                  {heldBalance !== null && heldBalance > 0 && (
+                    <Text style={styles.walletHeldBalance}>
+                      Held: ₹{heldBalance.toFixed(2)}
+                    </Text>
+                  )}
+                </View>
+              )}
+            </View>
+
             <TouchableOpacity
               style={[
                 styles.paymentOption,
-                paymentMethod === 'cash_on_delivery' && styles.selectedPaymentOption,
+                styles.selectedPaymentOption,
               ]}
-              onPress={() => setPaymentMethod('cash_on_delivery')}
             >
               <View style={styles.paymentOptionContent}>
                 <View style={styles.paymentOptionIcon}>
                   <Ionicons
-                    name="cash"
+                    name="wallet-outline"
                     size={24}
-                    color={paymentMethod === 'cash_on_delivery' ? colors.primary : colors.textSecondary}
+                    color={colors.primary}
                   />
                 </View>
 
@@ -580,50 +1165,18 @@ const DirectCheckoutScreen = () => {
                   <Text
                     style={[
                       styles.paymentOptionTitle,
-                      paymentMethod === 'cash_on_delivery' && styles.selectedPaymentOptionTitle,
+                      styles.selectedPaymentOptionTitle,
                     ]}
                   >
-                    Cash on Delivery
+                    Ankrishi-Wallet
+                  </Text>
+                  <Text style={styles.paymentOptionDescription}>
+                    Pay directly from your Ankrishi-Wallet
                   </Text>
                 </View>
               </View>
 
-              {paymentMethod === 'cash_on_delivery' && (
-                <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.paymentOption,
-                paymentMethod === 'upi' && styles.selectedPaymentOption,
-              ]}
-              onPress={() => setPaymentMethod('upi')}
-            >
-              <View style={styles.paymentOptionContent}>
-                <View style={styles.paymentOptionIcon}>
-                  <Ionicons
-                    name="phone-portrait"
-                    size={24}
-                    color={paymentMethod === 'upi' ? colors.primary : colors.textSecondary}
-                  />
-                </View>
-
-                <View style={styles.paymentOptionInfo}>
-                  <Text
-                    style={[
-                      styles.paymentOptionTitle,
-                      paymentMethod === 'upi' && styles.selectedPaymentOptionTitle,
-                    ]}
-                  >
-                    UPI Payment
-                  </Text>
-                </View>
-              </View>
-
-              {paymentMethod === 'upi' && (
-                <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-              )}
+              <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
             </TouchableOpacity>
           </View>
         </Card>
@@ -635,13 +1188,47 @@ const DirectCheckoutScreen = () => {
           </View>
 
           <View style={styles.summaryContent}>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Subtotal</Text>
-              <Text style={styles.summaryValue}>{formatCurrency(calculateTotalPrice())}</Text>
-            </View>
+            {isNegotiated ? (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>{quantity} {product?.stockUnit} × {formatCurrency(negotiatedPrice || 0)} (Negotiated)</Text>
+                <Text style={styles.summaryValue}>{formatCurrency(calculateTotalPrice())}</Text>
+              </View>
+            ) : (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>{quantity} {product?.stockUnit} × {formatCurrency(product?.discountedPrice || product?.price || 0)}</Text>
+                <Text style={styles.summaryValue}>{formatCurrency(calculateTotalPrice())}</Text>
+              </View>
+            )}
 
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Delivery Fee</Text>
+              <View style={{flex: 1}}>
+                <Text style={styles.summaryLabel}>Delivery Fee</Text>
+                {(product?.isPrelisted || (multipleProducts && cartItems?.some(item => item.isPrelisted))) && (
+                  <Text style={styles.deliveryFeeNote}>
+                    {product?.isPrelisted ? (() => {
+                      // Get harvest date from multiple possible locations
+                      let harvestDate = null;
+
+                      if (product.farmDetails?.harvestDate) {
+                        harvestDate = new Date(product.farmDetails.harvestDate);
+                      } else if (product.traceabilityInfo?.harvestDate) {
+                        harvestDate = new Date(product.traceabilityInfo.harvestDate);
+                      }
+
+                      if (harvestDate) {
+                        const tomorrow = new Date(new Date().setDate(new Date().getDate() + 1));
+                        return harvestDate.toDateString() === tomorrow.toDateString() ?
+                          "Standard fee for next-day harvest" :
+                          "Additional fee for non-next-day harvest";
+                      } else {
+                        return "Standard delivery fee";
+                      }
+                    })() : multipleProducts ? (
+                      "Fee based on harvest dates"
+                    ) : "Standard delivery fee"}
+                  </Text>
+                )}
+              </View>
               <Text style={styles.summaryValue}>{formatCurrency(calculateDeliveryFee())}</Text>
             </View>
 
@@ -822,6 +1409,12 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     color: '#4CAF50',
+  },
+  negotiatedTag: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: '700',
+    marginLeft: 4,
   },
   farmerCard: {
     marginHorizontal: 20,
@@ -1069,8 +1662,47 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2E3A59',
   },
+  paymentOptionDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 4,
+  },
   selectedPaymentOptionTitle: {
     color: '#4CAF50',
+  },
+  walletBalanceContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: '#F0F9F0',
+    borderRadius: 10,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#D1E7DD',
+  },
+  walletBalanceLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#2E3A59',
+  },
+  walletBalanceAmount: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#4CAF50',
+    marginBottom: 4,
+  },
+  walletAvailableBalance: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#4CAF50',
+    marginBottom: 2,
+  },
+  walletHeldBalance: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#F97316',
   },
   summaryCard: {
     marginHorizontal: 20,
@@ -1228,6 +1860,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#3B82F6',
     marginTop: 6,
+    fontStyle: 'italic',
+  },
+  deliveryFeeNote: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
     fontStyle: 'italic',
   },
 });

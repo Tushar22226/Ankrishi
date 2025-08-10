@@ -189,6 +189,27 @@ class DocumentService {
       return false;
     }
   }
+
+  // Add a document from URL (for contract PDFs)
+  async addDocument(document: Omit<Document, 'id'>): Promise<Document | null> {
+    try {
+      console.log(`Adding document for user: ${document.userId}`);
+
+      // Save to database
+      const documentsRef = database().ref('documents');
+      const newDocumentRef = documentsRef.push();
+      await newDocumentRef.set(document);
+
+      // Return the complete document
+      return {
+        id: newDocumentRef.key as string,
+        ...document
+      };
+    } catch (error) {
+      console.error('Error adding document:', error);
+      return null;
+    }
+  }
 }
 
 export default new DocumentService();

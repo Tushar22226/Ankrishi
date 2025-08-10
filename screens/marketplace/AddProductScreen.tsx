@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -71,6 +71,8 @@ const AddProductScreen = () => {
   const [stock, setStock] = useState('');
   const [stockUnit, setStockUnit] = useState<StockQuantityUnit>('kg');
   const [ripeness, setRipeness] = useState<ProduceRipeness | ''>('');
+  const [minimumOrderQuantity, setMinimumOrderQuantity] = useState('');
+  const [negotiatedPrice, setNegotiatedPrice] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [tags, setTags] = useState('');
   const [location, setLocation] = useState<{
@@ -97,6 +99,7 @@ const AddProductScreen = () => {
   const [certifications, setCertifications] = useState<{
     type: string;
     isSelected: boolean;
+    certificateImage?: string;
   }[]>([
     { type: 'organic', isSelected: false },
     { type: 'natural_farming', isSelected: false },
@@ -128,8 +131,14 @@ const AddProductScreen = () => {
     { stageName: 'Harvesting', description: '' },
     { stageName: 'Processing', description: '' },
     { stageName: 'Packaging', description: '' },
-    { stageName: 'Distribution', description: '' },
   ]);
+
+  // Set product journey to required for produce category
+  useEffect(() => {
+    if (category === 'produce') {
+      setEnableProductJourney(true);
+    }
+  }, [category]);
 
   // Loading states
   const [loading, setLoading] = useState(false);
@@ -164,8 +173,7 @@ const AddProductScreen = () => {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
+        allowsEditing: false, // Disabled crop option
         quality: 0.8,
       });
 
@@ -176,6 +184,37 @@ const AddProductScreen = () => {
     } catch (error) {
       console.error('Error selecting image:', error);
       Alert.alert('Error', 'Failed to select image');
+    }
+  };
+
+  // Handle certificate image selection
+  const handleSelectCertificateImage = async (certType: string) => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permissionResult.granted) {
+        Alert.alert('Permission Required', 'Please grant permission to access your photos');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false, // Disabled crop option
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        // Update the certification with the selected image
+        const newCertifications = certifications.map(cert =>
+          cert.type === certType
+            ? { ...cert, certificateImage: result.assets[0].uri }
+            : cert
+        );
+        setCertifications(newCertifications);
+      }
+    } catch (error) {
+      console.error('Error selecting certificate image:', error);
+      Alert.alert('Error', 'Failed to select certificate image');
     }
   };
 
@@ -317,8 +356,8 @@ const AddProductScreen = () => {
       }
     }
 
-    // Validate journey stages if product journey is enabled
-    if (enableProductJourney) {
+    // Validate journey stages if product journey is enabled or if category is produce
+    if (enableProductJourney || category === 'produce') {
       const invalidStages = journeyStages.some(stage => !stage.description.trim());
       if (invalidStages) {
         newErrors.journeyStages = 'Please complete all journey stage descriptions';
@@ -346,6 +385,19 @@ const AddProductScreen = () => {
       }
     }
 
+    // Validate that all selected certifications have certificate images
+    const selectedCertifications = certifications.filter(cert => cert.isSelected);
+    if (selectedCertifications.length > 0) {
+      const missingCertificateImages = selectedCertifications.filter(cert => !cert.certificateImage);
+      if (missingCertificateImages.length > 0) {
+        const missingCertNames = missingCertificateImages.map(cert =>
+          cert.type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+        ).join(', ');
+        newErrors.certificationImages = `Certificate images required for: ${missingCertNames}`;
+        isValid = false;
+      }
+    }
+
     setErrors(newErrors);
 
     if (!isValid) {
@@ -357,6 +409,9 @@ const AddProductScreen = () => {
     setLoading(true);
 
     try {
+      // Create a temporary product ID for image uploads
+      const tempProductId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
       // Upload images to Firebase Storage
       const uploadedImages = await Promise.all(
         images.map(async (uri, index) => {
@@ -366,7 +421,7 @@ const AddProductScreen = () => {
             const blob = await response.blob();
 
             // Upload to Firebase Storage
-            return await MarketplaceService.uploadProductImage(blob, 'temp-id', index === 0);
+            return await MarketplaceService.uploadProductImage(blob, tempProductId, index === 0);
           } catch (error) {
             console.error('Error uploading image:', error);
             // Fallback to local URI if upload fails
@@ -401,8 +456,12 @@ const AddProductScreen = () => {
         ratings: [], // Empty ratings array for new product
         // Add direct farmer fields
         isDirectFromFarmer: userProfile?.role === 'farmer',
-        // Add ripeness for produce category
+        // Add commission percentage based on category
+        commissionPercentage: category === 'produce' ? 0 : 2, // 0% for produce, 2% for others
+        // Add ripeness, minimum order quantity, and negotiated price for produce category
         ...(category === 'produce' && ripeness ? { ripeness } : {}),
+        ...(category === 'produce' && minimumOrderQuantity ? { minimumOrderQuantity: parseInt(minimumOrderQuantity, 10) || 0 } : {}),
+        ...(category === 'produce' && negotiatedPrice ? { negotiatedPrice: parseInt(negotiatedPrice, 10) || 0 } : {}),
         farmDetails: userProfile?.role === 'farmer' ? {
           farmName: userProfile?.farmDetails?.name || userProfile?.displayName || 'Farm',
           farmingMethod: userProfile?.farmDetails?.farmingMethod || 'conventional',
@@ -431,13 +490,31 @@ const AddProductScreen = () => {
 
         // Add certifications if any selected
         certifications: certifications.filter(cert => cert.isSelected).length > 0 ?
-          certifications.filter(cert => cert.isSelected).map(cert => {
+          await Promise.all(certifications.filter(cert => cert.isSelected).map(async cert => {
+            // Upload certificate image if available
+            let certificateUrl;
+            if (cert.certificateImage) {
+              try {
+                // Convert URI to blob
+                const response = await fetch(cert.certificateImage);
+                const blob = await response.blob();
+
+                // Use the same temporary product ID created earlier
+                // Upload to Firebase Storage
+                certificateUrl = await MarketplaceService.uploadCertificateImage(blob, tempProductId, cert.type);
+              } catch (error) {
+                console.error(`Error uploading ${cert.type} certificate image:`, error);
+                // Continue without the certificate image if upload fails
+              }
+            }
+
             const certData = {
               type: cert.type as CertificationType,
               issuedBy: userProfile?.displayName || 'Self-certified',
               issuedDate: Date.now(),
               expiryDate: Date.now() + (365 * 24 * 60 * 60 * 1000), // 1 year validity
               verificationCode: Math.random().toString(36).substring(2, 10).toUpperCase(),
+              certificateUrl: certificateUrl || undefined,
             };
 
             // Add AACC specific details if this is an AACC certification
@@ -459,7 +536,7 @@ const AddProductScreen = () => {
             }
 
             return certData;
-          }) : undefined,
+          })) : undefined,
 
         // Add product journey if enabled
         productJourney: enableProductJourney ? {
@@ -578,6 +655,22 @@ const AddProductScreen = () => {
           {errors.category ? (
             <Text style={styles.errorText}>{errors.category}</Text>
           ) : null}
+
+          {/* Commission Notice for non-Produce categories */}
+          {category && category !== 'produce' && (
+            <View style={styles.commissionNoticeContainer}>
+              <View style={styles.commissionNoticeIcon}>
+                <Ionicons name="information-circle" size={24} color={colors.warning} />
+              </View>
+              <View style={styles.commissionNoticeContent}>
+                <Text style={styles.commissionNoticeTitle}>2% Transaction Fee</Text>
+                <Text style={styles.commissionNoticeText}>
+                  A 2% transaction fee will be charged as commission for all non-Produce category products.
+                  Produce category products are exempt from this fee.
+                </Text>
+              </View>
+            </View>
+          )}
 
           {/* Subcategory Selection */}
           {category && (
@@ -709,6 +802,37 @@ const AddProductScreen = () => {
             </View>
           </View>
 
+          {/* Minimum Order Quantity for Produce */}
+          {category === 'produce' && (
+            <View style={styles.row}>
+              <View style={styles.fullInput}>
+                <Input
+                  label="Minimum Order Quantity"
+                  placeholder={`Enter minimum quantity to be purchased (in ${stockUnit})`}
+                  value={minimumOrderQuantity}
+                  onChangeText={setMinimumOrderQuantity}
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+          )}
+
+          {/* Negotiated Price for Produce */}
+          {category === 'produce' && (
+            <View style={styles.row}>
+              <View style={styles.fullInput}>
+                <Input
+                  label={`Negotiated Price per ${stockUnit} (Hidden from buyers)`}
+                  placeholder={`Enter your lowest acceptable price per ${stockUnit}`}
+                  value={negotiatedPrice}
+                  onChangeText={setNegotiatedPrice}
+                  keyboardType="numeric"
+                  helperText="This is the lowest price per unit you're willing to accept through negotiation. This won't be shown to buyers."
+                />
+              </View>
+            </View>
+          )}
+
           {/* Product Images */}
           <View style={[styles.sectionHeader, {marginTop: spacing.md}]}>
             <Ionicons name="images" size={24} color={colors.primary} />
@@ -780,7 +904,7 @@ const AddProductScreen = () => {
               </View>
 
               <Text style={styles.transparencyNote}>
-                Your product will be listed as "Direct from Farmer" with 0% commission.
+                Your product will be listed as "Direct from Farmer". Produce category products have 0% commission, while other categories have a 2% transaction fee.
               </Text>
             </View>
           )}
@@ -994,6 +1118,45 @@ const AddProductScreen = () => {
             Certified products appear in special categories and get premium visibility
           </Text>
 
+          {/* Certificate Images for Selected Certifications */}
+          {certifications.filter(cert => cert.isSelected).map((cert) => (
+            <View key={`${cert.type}-image`} style={styles.certificateImageContainer}>
+              <Text style={styles.certificateImageLabel}>
+                {cert.type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')} Certificate Image
+                <Text style={styles.requiredStar}> *</Text>
+              </Text>
+
+              {cert.certificateImage ? (
+                <View style={styles.selectedCertificateContainer}>
+                  <Image source={{ uri: cert.certificateImage }} style={styles.certificateImage} />
+                  <TouchableOpacity
+                    style={styles.removeCertificateButton}
+                    onPress={() => {
+                      const newCertifications = certifications.map(c =>
+                        c.type === cert.type ? { ...c, certificateImage: undefined } : c
+                      );
+                      setCertifications(newCertifications);
+                    }}
+                  >
+                    <Ionicons name="close-circle" size={24} color={colors.error} />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.addCertificateButton, !cert.certificateImage && styles.requiredCertificateButton]}
+                  onPress={() => handleSelectCertificateImage(cert.type)}
+                >
+                  <Ionicons name="camera" size={24} color={colors.primary} />
+                  <Text style={styles.addCertificateText}>Upload Certificate</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
+
+          {errors.certificationImages ? (
+            <Text style={styles.errorText}>{errors.certificationImages}</Text>
+          ) : null}
+
           {/* AACC Certification Details */}
           {certifications.find(cert => cert.type === 'aacc')?.isSelected && (
             <View style={styles.aaccContainer}>
@@ -1128,24 +1291,27 @@ const AddProductScreen = () => {
           <View style={styles.journeyContainer}>
             <View style={styles.journeyHeader}>
               <Text style={styles.journeyTitle}>
-                Enable product journey tracking
+                Product journey tracking {category === 'produce' && <Text style={styles.requiredStar}>*</Text>}
               </Text>
-              <TouchableOpacity
-                style={[
-                  styles.journeyToggle,
-                  enableProductJourney && styles.journeyToggleActive
-                ]}
-                onPress={() => setEnableProductJourney(!enableProductJourney)}
-              >
-                <View style={[
-                  styles.toggleCircle,
-                  enableProductJourney && styles.toggleCircleActive
-                ]} />
-              </TouchableOpacity>
+              {category !== 'produce' && (
+                <TouchableOpacity
+                  style={[
+                    styles.journeyToggle,
+                    enableProductJourney && styles.journeyToggleActive
+                  ]}
+                  onPress={() => setEnableProductJourney(!enableProductJourney)}
+                >
+                  <View style={[
+                    styles.toggleCircle,
+                    enableProductJourney && styles.toggleCircleActive
+                  ]} />
+                </TouchableOpacity>
+              )}
             </View>
 
             <Text style={styles.journeyDescription}>
               Let customers trace the journey of your product from farm to table.
+              {category === 'produce' && ' Required for produce category.'}
             </Text>
 
             {enableProductJourney && (
@@ -1393,6 +1559,34 @@ const styles = StyleSheet.create({
   activeSubcategoryButton: {
     borderColor: colors.primary,
     backgroundColor: colors.primaryLight,
+  },
+  commissionNoticeContainer: {
+    flexDirection: 'row',
+    backgroundColor: colors.warning + '15', // 15% opacity
+    borderWidth: 1,
+    borderColor: colors.warning + '50', // 50% opacity
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    marginTop: spacing.sm,
+  },
+  commissionNoticeIcon: {
+    marginRight: spacing.sm,
+  },
+  commissionNoticeContent: {
+    flex: 1,
+  },
+  commissionNoticeTitle: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  commissionNoticeText: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.textSecondary,
+    lineHeight: typography.lineHeight.md,
   },
   subcategoryText: {
     fontSize: typography.fontSize.sm,
@@ -1708,6 +1902,63 @@ const styles = StyleSheet.create({
   certificationTextActive: {
     color: colors.primary,
   },
+  certificateImageContainer: {
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  certificateImageLabel: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  selectedCertificateContainer: {
+    position: 'relative',
+    width: '100%',
+    height: 200,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.lightGray,
+  },
+  certificateImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  removeCertificateButton: {
+    position: 'absolute',
+    top: spacing.xs,
+    right: spacing.xs,
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    padding: 2,
+  },
+  addCertificateButton: {
+    width: '100%',
+    height: 120,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.primary,
+    borderRadius: borderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceLight,
+  },
+  requiredCertificateButton: {
+    borderColor: colors.error,
+    backgroundColor: 'rgba(255, 0, 0, 0.05)',
+  },
+  addCertificateText: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.primary,
+    marginTop: spacing.xs,
+  },
+  requiredStar: {
+    color: colors.error,
+    fontFamily: typography.fontFamily.bold,
+  },
 
   // Product Journey Styles
   journeyContainer: {
@@ -1727,6 +1978,11 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.bold,
     color: colors.textPrimary,
     flex: 1,
+  },
+  requiredStar: {
+    color: colors.error,
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.bold,
   },
   journeyToggle: {
     width: 50,

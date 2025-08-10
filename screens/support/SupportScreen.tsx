@@ -87,7 +87,7 @@ const SupportScreen = () => {
         [
           {
             text: 'Email',
-            onPress: () => Linking.openURL('mailto:support@farmconnect.com'),
+            onPress: () => Linking.openURL('mailto:support@ankrishi.com'),
           },
           {
             text: 'Phone',
@@ -106,7 +106,7 @@ const SupportScreen = () => {
         [
           {
             text: 'Report via Email',
-            onPress: () => Linking.openURL('mailto:report@farmconnect.com?subject=Scam Report'),
+            onPress: () => Linking.openURL('mailto:report@ankrishi.com?subject=Scam Report'),
           },
           {
             text: 'Cancel',

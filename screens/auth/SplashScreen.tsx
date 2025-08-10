@@ -66,7 +66,7 @@ const SplashScreen = () => {
           style={styles.logo}
           resizeMode="contain"
         />
-        <Text style={styles.title}>FarmConnect</Text>
+        <Text style={styles.title}>ankrishi</Text>
         <Text style={styles.subtitle}>Connecting Farmers to Prosperity</Text>
       </Animated.View>
 
@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     ...getPlatformTopSpacing('paddingTop', 0, spacing.md),
-    backgroundColor: colors.primary,
+    backgroundColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.lg,
@@ -113,13 +113,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: typography.fontSize.xxxl,
     fontFamily: typography.fontFamily.bold,
-    color: colors.white,
+    color: colors.black,
     marginBottom: spacing.xs,
   },
   subtitle: {
     fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily.regular,
-    color: colors.white,
+    color: colors.black,
     opacity: 0.8,
   },
   quoteContainer: {
@@ -129,18 +129,18 @@ const styles = StyleSheet.create({
     maxWidth: 300,
     marginTop: spacing.xl,
     borderLeftWidth: 4,
-    borderLeftColor: colors.white,
+    borderLeftColor: colors.primary,
   },
   quoteText: {
     fontSize: typography.fontSize.md,
     fontFamily: typography.fontFamily.medium,
-    color: colors.white,
+    color: colors.black,
     textAlign: 'center',
   },
   quoteAuthor: {
     fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily.regular,
-    color: colors.white,
+    color: colors.black,
     opacity: 0.8,
     textAlign: 'right',
     marginTop: spacing.xs,
