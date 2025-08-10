@@ -1,0 +1,202 @@
+---
+title: FarmConnects Application Flowchart
+---
+flowchart TD
+    %% Main Application Flow
+    A[App.tsx Entry Point] --> B[Firebase Initializer]
+    B --> C[AppNavigator]
+    C --> D{Authentication State}
+    D -->|Loading| E[SplashScreen]
+    D -->|Not Logged In| F[AuthNavigator]
+    D -->|Logged In| G[TabNavigator]
+    F --> H[Login/Signup]
+    H --> I[Profile Setup]
+    I --> G
+    G --> J[Main App Flow]
+
+    %% Authentication Flow
+    subgraph AuthFlow[Authentication Flow]
+        AA[LoginScreen] --> AB[SignupScreen]
+        AB --> AC[ProfileSetupScreen]
+        AA --> AD[Email Login]
+        AB --> AE[Email Signup]
+        AC --> AF[User Profile Creation]
+        AD --> AG[Firebase Auth]
+        AE --> AG
+        AF --> AH[Firebase DB User Profile]
+        AH --> G
+    end
+
+    %% Main Navigation
+    subgraph NavFlow[Main Navigation]
+        GA[TabNavigator] --> GB[HomeStack]
+        GA --> GC[MarketplaceStack]
+        GA --> GD[ELearningStack]
+        GA --> GE[ChatbotStack]
+        GA --> GF[MyFarmStack]
+        GB --> GG[HomeScreen]
+        GC --> GH[MarketplaceScreen]
+        GD --> GI[ELearningScreen]
+        GE --> GJ[ChatbotScreen]
+        GF --> GK[MyFarmScreen]
+    end
+
+    %% Home Screen Flow
+    subgraph HomeFlow[Home Screen Flow]
+        HA[HomeScreen] --> HB[Weather Widget]
+        HA --> HC[Feature Cards]
+        HA --> HD[Featured Products]
+        HA --> HE[Support Section]
+        HA --> HF[Settings]
+        HB --> HG[AIForecastScreen]
+        HC --> HH[Various Feature Screens]
+        HD --> HI[ProductDetailsScreen]
+        HE --> HJ[CrisisSupportScreen]
+        HF --> HK[EditProfileScreen]
+    end
+
+    %% Marketplace Flow
+    subgraph MarketFlow[Marketplace Flow]
+        MA[MarketplaceScreen] --> MB[Featured Products]
+        MA --> MC[Direct Farmer Products]
+        MA --> MD[Verified Products]
+        MA --> ME[Recent Products]
+        MA --> MF[Add Product Button]
+        MB --> MG[ProductDetailsScreen]
+        MC --> MH[FarmerStorefrontScreen]
+        MD --> MG
+        ME --> MG
+        MF --> MI[AddProductScreen]
+        MG --> MJ[DirectCheckoutScreen]
+        MH --> MK[NearbyFarmersScreen]
+        MG --> ML[CartScreen]
+        MG --> MM[Negotiation Flow]
+        MI --> MN[Firebase DB Products]
+        MJ --> MO[OrderTrackingScreen]
+        ML --> MP[OrderManagementScreen]
+    end
+
+    %% My Farm Flow
+    subgraph FarmFlow[My Farm Flow]
+        FA[MyFarmScreen] --> FB[ExpenseTrackerScreen]
+        FA --> FC[ReportsScreen]
+        FA --> FD[OrdersScreen]
+        FA --> FE[PrelistedProducts]
+        FA --> FF[WarehouseScreen]
+        FB --> FG[AddIncomeScreen]
+        FB --> FH[AddExpenseScreen]
+        FC --> FI[DetailedReportScreen]
+        FD --> FJ[OrderTrackingScreen]
+        FE --> FK[AddPrelistedProductScreen]
+    end
+
+    %% AI Features Flow
+    subgraph AIFlow[AI Features Flow]
+        AA1[AI Features] --> AB1[ForecastScreen]
+        AA1 --> AC1[AIForecastScreen]
+        AA1 --> AD1[FinancialPlanScreen]
+        AA1 --> AE1[CropDiseaseDetectionScreen]
+        AA1 --> AF1[SensorDataScreen]
+        AB1 --> AG1[Weather Forecast]
+        AC1 --> AH1[Crop Recommendations]
+        AD1 --> AI1[Financial Planning]
+        AE1 --> AJ1[Disease Identification]
+        AF1 --> AK1[Sensor Analytics]
+        AH1 --> AL1[Market Price Forecasts]
+        AI1 --> AM1[Financial Recommendations]
+        AJ1 --> AN1[Treatment Recommendations]
+        AK1 --> AO1[SensorDataReportViewScreen]
+    end
+
+    %% Contract Management Flow
+    subgraph ContractFlow[Contract Management Flow]
+        CA[ContractManagementScreen] --> CB[AddContractScreen]
+        CA --> CC[ContractDetailsScreen]
+        CA --> CD[Tenders]
+        CB --> CE[Firebase DB Contracts]
+        CC --> CF[ContractDetailsManagement]
+        CD --> CG[Apply for Tender]
+        CF --> CH[Contract Overview]
+        CF --> CI[Deliveries Management]
+        CF --> CJ[Payments Management]
+        CF --> CK[Documents Management]
+    end
+
+    %% Data Flow
+    subgraph DataFlow[Data Flow]
+        DA[User Actions] --> DB[Services Layer]
+        DB --> DC[MarketplaceService]
+        DB --> DD[FinanceService]
+        DB --> DE[ForecastService]
+        DB --> DF[SensorService]
+        DB --> DG[Other Services]
+        DC --> DH[Firebase Database]
+        DD --> DH
+        DE --> DH
+        DF --> DH
+        DG --> DH
+        DH --> DI[Products]
+        DH --> DJ[Transactions]
+        DH --> DK[Weather Data]
+        DH --> DL[Sensor Data]
+        DH --> DM[Other Data]
+    end
+
+    %% User Verification Flow
+    subgraph VerifyFlow[User Verification Flow]
+        VA[VerifyProfileScreen] --> VB[VendorTypeSelection]
+        VB --> VC[Farmer Verification]
+        VB --> VD[Individual Vendor Verification]
+        VB --> VE[Company Verification]
+        VB --> VF[Consultant Verification]
+        VC --> VG[VerificationService]
+        VD --> VG
+        VE --> VG
+        VF --> VG
+        VG --> VH[Firebase DB users/verification]
+        VH --> VI[Verification Status Badge]
+    end
+
+    %% Delivery Management Flow
+    subgraph DeliveryFlow[Delivery Management Flow]
+        XA[DeliveryManagementScreen] --> XB[Pending Deliveries]
+        XA --> XC[In Progress Deliveries]
+        XA --> XD[Completed Deliveries]
+        XA --> XE[Delivery History]
+        XB --> XF[Accept/Reject Delivery]
+        XC --> XG[Update Status]
+        XD --> XH[Delivery Details]
+    end
+
+    %% Prelisted Products Flow
+    subgraph PrelistFlow[Prelisted Products Flow]
+        PA[Prelisted Products] --> PB[AddPrelistedProduct]
+        PA --> PC[ViewPrelistedProducts]
+        PA --> PD[PrelistedOrders]
+        PB --> PE[Firebase DB prelisted_products]
+        PC --> PF[ProductDetails]
+        PD --> PG[OrderTracking]
+    end
+
+    %% Chatbot Flow
+    subgraph ChatFlow[Chatbot Flow]
+        YA[ChatbotScreen] --> YB[User Message]
+        YB --> YC[ChatbotService]
+        YC --> YD[Language Detection]
+        YC --> YE[Search Data]
+        YC --> YF[Generate Response]
+        YD --> YG[Respond in Marathi/Hindi]
+        YF --> YH[Display Response]
+    end
+
+    %% Connect main flows
+    J --- NavFlow
+    NavFlow --- HomeFlow
+    NavFlow --- MarketFlow
+    NavFlow --- FarmFlow
+    NavFlow --- AIFlow
+    NavFlow --- ChatFlow
+    HomeFlow --- ContractFlow
+    HomeFlow --- VerifyFlow
+    MarketFlow --- PrelistFlow
+    F --- AuthFlow

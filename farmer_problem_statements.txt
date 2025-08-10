@@ -1,0 +1,94 @@
+# COMPREHENSIVE PROBLEM STATEMENTS FOR INDIAN FARMERS
+# Addressed by Ankrishi App
+
+## Core Problems
+
+1. FRAGMENTED SUPPLY CHAIN
+- 5-6 intermediaries exist between farmers and consumers
+- Each middleman takes 5-15% of the value
+- Farmers receive only 30-40% of the final consumer price
+- This significantly reduces farmer profits
+
+2. LACK OF DIRECT MARKET ACCESS
+- Small farmers have limited transportation options to reach larger markets
+- Restricted to local mandis (markets) where price manipulation occurs
+- Dependency on local markets limits ability to get fair prices
+
+3. INFORMATION ASYMMETRY
+- Lack of access to reliable weather forecasts leading to crop losses
+- Limited market price transparency across different regions
+- Insufficient knowledge about optimal selling times and market conditions
+- Limited access to agricultural best practices
+
+4. FINANCIAL VULNERABILITY
+- Average Indian farmer's monthly income is approximately ₹10,000
+- About 52% of agricultural households in India are in debt
+- Lack of proper financial planning and management tools
+- Insufficient tools for expense tracking and income monitoring
+
+5. CLIMATE UNCERTAINTY & RISK MANAGEMENT
+- Increasing unpredictability in weather patterns affecting crop planning
+- Limited access to localized weather predictions
+- Difficulty adapting to changing climate conditions
+
+6. VERIFICATION CHALLENGES
+- Difficulty proving product quality and authenticity
+- Limited certification access for small farmers
+- Trust issues between farmers and buyers in the marketplace
+
+7. MENTAL HEALTH & CRISIS SUPPORT
+- Farming stress leading to mental health challenges
+- Limited access to support resources in rural areas
+- Financial pressures contributing to farmer distress
+
+## Additional Challenges
+
+8. LAND OWNERSHIP & LEGAL ISSUES
+- Land dispute challenges with encroachment and possession issues
+- Documentation complexity for land transfers and ownership verification
+- Legal knowledge gap regarding agricultural land laws and rights
+- Scam vulnerability with land-related fraudulent transactions
+
+9. AGRICULTURAL KNOWLEDGE & EDUCATION GAPS
+- Limited access to training on modern farming techniques
+- Educational content scarcity in accessible, local languages
+- Knowledge transfer barriers between generations
+- Digital literacy challenges limiting access to online resources
+
+10. EQUIPMENT & TECHNOLOGY ACCESS
+- High equipment costs prohibitive for individual farmers
+- Limited rental options for agricultural machinery
+- Maintenance challenges for existing equipment
+- Technology adoption barriers due to awareness and training gaps
+
+11. CROP MANAGEMENT CHALLENGES
+- Soil health degradation from chemical fertilizer overuse
+- Irrigation inefficiency and water management issues
+- Pest & disease management knowledge limitations
+- Crop planning difficulties for specific conditions
+
+12. GOVERNMENT SCHEME NAVIGATION
+- Awareness gaps about available support programs
+- Application complexity for agricultural schemes
+- Documentation barriers for scheme eligibility
+- Benefit delivery issues with delays and inefficiencies
+
+13. MARKET TIMING & LOGISTICS
+- Harvest timing challenges for optimal selling
+- Storage limitations leading to post-harvest losses
+- Transportation constraints for market access
+- Cold chain gaps for perishable products
+
+14. COLLECTIVE ACTION BARRIERS
+- Limited farmer networking and knowledge sharing
+- Cooperative formation challenges in rural areas
+- Collective bargaining weakness with buyers
+- Bulk purchasing barriers for agricultural inputs
+
+15. ENVIRONMENTAL & SUSTAINABILITY CHALLENGES
+- Climate adaptation difficulties for changing patterns
+- Sustainable practice knowledge limitations
+- Resource conservation issues with water and soil
+- Organic certification barriers for market premium access
+
+These problem statements form the foundation of Ankrishi's mission to create a more equitable, transparent, and efficient agricultural ecosystem for Indian farmers through technology-enabled solutions.
